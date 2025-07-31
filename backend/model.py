@@ -49,6 +49,8 @@ class BrewMastersModel(Model):
         self.game_state[inventory_key] -= sales
         self.game_state[inventory_key] += production_target
         self.game_state[f"{team_prefix}_price"] = price
+        self.game_state[f"{team_prefix}_profit_this_turn"] = profit_this_turn
+        self.game_state[f"{team_prefix}_production_target"] = production_target
         return {'sales': sales, 'profit_this_turn': profit_this_turn}
     
     def get_state_as_json(self):

@@ -1,11 +1,12 @@
 'use client';
 import { useEffect, useState } from "react";
-import Controls from "./controls";
 import { getWebSocketClient } from "../utils/wesocket";
 import { IMessageEvent, w3cwebsocket as W3CWebSocket } from "websocket";
 import React from "react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
- 
+import { motion } from 'framer-motion';
+import Controls from "./controls";
+
 interface TeamPanelProps {
     title: string;
     totalProfit: number;
@@ -18,14 +19,18 @@ interface TeamPanelProps {
 }
 
 const TeamPanel: React.FC<TeamPanelProps> = ({ title, totalProfit, profitThisTurn, inventory, projectedDemand, children, bgColor, textColor }) => (
-    <div className={`${bgColor} w-1/2 p-6 flex flex-col`}>
+    <div className={`${bgColor} w-full p-6 flex flex-col`}>
         <h1 className={`text-2xl font-bold ${textColor} mb-4`}>{title}</h1>
         <div className="flex-grow">
-            <p className="text-4xl font-bold">${totalProfit}</p>
-            <p className="text-lg text-gray-600">Total Profit</p>
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }}>
+                <p className="text-4xl font-bold">${totalProfit.toLocaleString()}</p>
+                <p className="text-lg text-gray-600">Total Profit</p>
+            </motion.div>
 
-            <p className="text-2xl font-bold mt-4">${profitThisTurn}</p>
-            <p className="text-md text-gray-600">Profit This Turn</p>
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5, delay: 0.2 }}>
+                <p className="text-2xl font-bold mt-4">${profitThisTurn.toLocaleString()}</p>
+                <p className="text-md text-gray-600">Profit This Turn</p>
+            </motion.div>
 
             <p className="text-2xl font-bold mt-4">{inventory} units</p>
             <p className="text-md text-gray-600">Current Inventory</p>
@@ -43,13 +48,13 @@ interface GraphData {
     blue: number;
 }
 
-interface OrderVolumeGraphProps {
+interface ProductionGraphProps {
     data: GraphData[];
 }
 
-const OrderVolumeGraph: React.FC<OrderVolumeGraphProps> = ({ data }) => (
+const ProductionGraph: React.FC<ProductionGraphProps> = ({ data }) => (
     <div className="w-full h-64 bg-gray-100 p-4 mt-4">
-        <h2 className="text-lg font-bold mb-2">Order Volume Graph</h2>
+        <h2 className="text-lg font-bold mb-2">Production Target Over Time</h2>
         <ResponsiveContainer width="100%" height="100%">
             <LineChart data={data}>
                 <CartesianGrid strokeDasharray="3 3" />
@@ -57,8 +62,8 @@ const OrderVolumeGraph: React.FC<OrderVolumeGraphProps> = ({ data }) => (
                 <YAxis />
                 <Tooltip />
                 <Legend />
-                <Line type="monotone" dataKey="green" stroke="#82ca9d" activeDot={{ r: 8 }} />
-                <Line type="monotone" dataKey="blue" stroke="#8884d8" />
+                <Line type="monotone" dataKey="green" stroke="#82ca9d" name="Green Team" />
+                <Line type="monotone" dataKey="blue" stroke="#8884d8" name="Blue Team" />
             </LineChart>
         </ResponsiveContainer>
     </div>
@@ -78,19 +83,14 @@ const EventLog: React.FC<EventLogProps> = ({ logs }) => (
 );
 
 
+
 function Dashboard() {
     const [logs, setLogs] = useState<string[]>([]);
     const [client, setClient] = useState<W3CWebSocket | null>(null);
 
-    // Placeholder data
-    const [greenTeamData, setGreenTeamData] = useState({ totalProfit: 12000, profitThisTurn: 500, inventory: 150, projectedDemand: 200 });
-    const [blueTeamData, setBlueTeamData] = useState({ totalProfit: 15000, profitThisTurn: 750, inventory: 200, projectedDemand: 250 });
-    const [graphData, setGraphData] = useState([
-        { name: 'Turn 1', green: 100, blue: 120 },
-        { name: 'Turn 2', green: 110, blue: 130 },
-        { name: 'Turn 3', green: 105, blue: 125 },
-        { name: 'Turn 4', green: 120, blue: 140 },
-    ]);
+    const [greenTeamData, setGreenTeamData] = useState({ totalProfit: 0, profitThisTurn: 0, inventory: 0, projectedDemand: 0, productionTarget: 0 });
+    const [blueTeamData, setBlueTeamData] = useState({ totalProfit: 0, profitThisTurn: 0, inventory: 0, projectedDemand: 0, productionTarget: 0 });
+    const [graphData, setGraphData] = useState<GraphData[]>([]);
 
 
     useEffect(() => {
@@ -101,11 +101,33 @@ function Dashboard() {
             wsClient.onmessage = (message: IMessageEvent) => {
                 if (typeof message.data === 'string') {
                     console.log("Received message from server: ", message.data);
-                    setLogs(prevLogs => [...prevLogs, message.data as string]);
-                    // Here you would parse the message and update team data
-                    // e.g. const data = JSON.parse(message.data);
-                    // setGreenTeamData(...);
-                    // setBlueTeamData(...);
+                    const data = JSON.parse(message.data);
+
+                    setGreenTeamData({
+                        totalProfit: data.green_team_profit,
+                        profitThisTurn: data.green_team_profit_this_turn || 0,
+                        inventory: data.green_team_inventory,
+                        projectedDemand: data.green_team_projected_demand || 0,
+                        productionTarget: data.green_team_production_target || 0,
+                    });
+                    setBlueTeamData({
+                        totalProfit: data.blue_team_profit,
+                        profitThisTurn: data.blue_team_profit_this_turn || 0,
+                        inventory: data.blue_team_inventory,
+                        projectedDemand: data.blue_team_projected_demand || 0,
+                        productionTarget: data.blue_team_production_target || 0,
+                    });
+
+                    setGraphData(prevData => [...prevData, {
+                        name: `Turn ${data.turn}`,
+                        green: data.green_team_production_target || 0,
+                        blue: data.blue_team_production_target || 0,
+                    }]);
+
+                    setLogs(prevLogs => {
+                        const newLogs = Array.isArray(data.event_log) ? data.event_log : [data.event_log];
+                        return [...prevLogs, ...newLogs].slice(-10); // Keep last 10 logs
+                    });
                 }
             };
         }
@@ -118,8 +140,8 @@ function Dashboard() {
     }, []);
     
     return(
-        <div className="dashboard flex flex-col h-screen bg-gray-50">
-            <div className="flex flex-grow">
+        <div className="dashboard grid grid-cols-2 gap-4 h-screen bg-gray-50 p-4">
+            <div className="flex flex-col">
                 <TeamPanel 
                     title="🟩 Green Team (Human Player)"
                     totalProfit={greenTeamData.totalProfit}
@@ -131,9 +153,9 @@ function Dashboard() {
                 >
                     <Controls client={client} />
                 </TeamPanel>
+            </div>
 
-                <div className="border-r-2 border-gray-300"></div>
-
+            <div className="flex flex-col">
                 <TeamPanel
                     title="🟦 Blue Team (MAS)"
                     totalProfit={blueTeamData.totalProfit}
@@ -144,8 +166,11 @@ function Dashboard() {
                     textColor="text-blue-700"
                 />
             </div>
-            <div className="flex-shrink-0 p-6">
-                <OrderVolumeGraph data={graphData} />
+
+            <div className="col-span-2">
+                <ProductionGraph data={graphData} />
+            </div>
+            <div className="col-span-2">
                 <EventLog logs={logs} />
             </div>
         </div>
