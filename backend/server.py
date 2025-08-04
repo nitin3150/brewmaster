@@ -1,38 +1,3 @@
-# import asyncio
-# import websockets
-# import json
-# from model import BrewMastersModel
-
-# # Create a single, persistent instance of your game model
-# game_model = BrewMastersModel()
-
-# async def handler(websocket, path):
-#     """Handles communication with a single client."""
-#     print("Front-end client connected.")
-#     try:
-#         # Send the initial game state on connection
-
-#         await websocket.send(game_model.get_state_as_json())
-#         async for message in websocket:
-#             human_decisions = json.loads(message)
-#             print(f"Received human decisions: {human_decisions}")
-#             # Process one full turn for both teams
-#             game_model.step(human_decisions)
-#             # Send the new, updated game state back to the client
-#             await websocket.send(game_model.get_state_as_json())
-#     except websockets.exceptions.ConnectionClosed:
-#         print("Client disconnected.")
-#     except Exception as e:
-#         print(f"An error occurred: {e}")
-#         import traceback
-#         traceback.print_exc()
-# async def main():
-#     """Starts the WebSocket server."""
-#     async with websockets.serve(handler, "0.0.0.0", 8766):
-#         print("BrewMasters MAS Server started on port 8766...")
-#         await asyncio.Future()  # Run forever
-# if __name__ == "__main__":
-#     asyncio.run(main())
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from model import BrewMastersModel
@@ -49,13 +14,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Create a persistent model instance
-game_model = BrewMastersModel()
+# Store game instances per connection
+game_instances = {}
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     print("Client connected via WebSocket")
+    
+    # Create a new game instance for this connection
+    connection_id = id(websocket)
+    game_instances[connection_id] = BrewMastersModel()
+    game_model = game_instances[connection_id]
 
     try:
         # Send initial game state
@@ -63,6 +33,16 @@ async def websocket_endpoint(websocket: WebSocket):
 
         while True:
             message = await websocket.receive_text()
+            
+            # Check if it's a restart command
+            if message == '{"restart": true}':
+                # Create a fresh game instance
+                game_instances[connection_id] = BrewMastersModel()
+                game_model = game_instances[connection_id]
+                await websocket.send_text(game_model.get_state_as_json())
+                continue
+            
+            # Otherwise, process as normal turn
             human_decisions = json.loads(message)
             print(f"Received human decisions: {human_decisions}")
 
@@ -74,7 +54,13 @@ async def websocket_endpoint(websocket: WebSocket):
 
     except WebSocketDisconnect:
         print("Client disconnected")
+        # Clean up the game instance
+        if connection_id in game_instances:
+            del game_instances[connection_id]
     except Exception as e:
         print(f"Error: {e}")
         import traceback
         traceback.print_exc()
+        # Clean up on error
+        if connection_id in game_instances:
+            del game_instances[connection_id]
