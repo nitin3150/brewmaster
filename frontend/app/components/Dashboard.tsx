@@ -229,7 +229,9 @@ function Dashboard() {
         }, 500);
     };
 
-    const setupWebSocketHandlers = (wsClient: W3CWebSocket) => {
+    const setupWebSocketHandlers = (wsClient: W3CWebSocket | null) => {
+        if (!wsClient) return;
+
         wsClient.onopen = () => {
             setIsConnected(true);
             setLogs(prev => ['Connected to server!', ...prev].slice(0, 10));
@@ -280,15 +282,17 @@ function Dashboard() {
     };
 
     useEffect(() => {
-        const wsClient = getWebSocketClient();
-        setClient(wsClient);
-        setupWebSocketHandlers(wsClient);
+        if (typeof window !== 'undefined') {
+            const wsClient = getWebSocketClient();
+            setClient(wsClient);
+            setupWebSocketHandlers(wsClient);
 
-        return () => {
-            if (wsClient) {
-                wsClient.close();
-            }
-        };
+            return () => {
+                if (wsClient) {
+                    wsClient.close();
+                }
+            };
+        }
     }, []);
     
     return(

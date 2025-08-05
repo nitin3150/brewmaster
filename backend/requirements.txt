@@ -1,3 +1,6 @@
-mesa
+Mesa==2.2.1
 numpy
 websockets
+gunicorn
+fastapi
+uvicorn
