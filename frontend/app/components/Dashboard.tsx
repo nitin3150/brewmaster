@@ -84,7 +84,7 @@ const TeamPanel: React.FC<TeamPanelProps> = ({
                 <div className="grid grid-cols-3 gap-2 text-xs">
                     <div>
                         <p className="text-gray-600">Price</p>
-                        <p className={`font-bold ${accentColor}`}>${price || 0}</p>
+                        <p className={`font-bold ${accentColor}`}>${(price || 0).toFixed(2)}</p>
                     </div>
                     <div>
                         <p className="text-gray-600">Production</p>
@@ -105,13 +105,29 @@ const TeamPanel: React.FC<TeamPanelProps> = ({
 // Controls Component
 interface ControlsProps {
     onSubmit: (decisions: {price: number, productionTarget: number, marketingSpend: number}) => void;
+    currentPrice?: number;
+    currentProduction?: number;
+    currentMarketing?: number;
 }
 
-const Controls: React.FC<ControlsProps> = ({ onSubmit }) => {
-    const [price, setPrice] = useState(10);
-    const [productionTarget, setProductionTarget] = useState(50);
-    const [marketingSpend, setMarketingSpend] = useState(500);
+const Controls: React.FC<ControlsProps> = ({ onSubmit, currentPrice, currentProduction, currentMarketing }) => {
+    const [price, setPrice] = useState(currentPrice || 10);
+    const [productionTarget, setProductionTarget] = useState(currentProduction || 50);
+    const [marketingSpend, setMarketingSpend] = useState(currentMarketing || 500);
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    // Update local state when props change
+    React.useEffect(() => {
+        if (currentPrice !== undefined) setPrice(currentPrice);
+    }, [currentPrice]);
+    
+    React.useEffect(() => {
+        if (currentProduction !== undefined) setProductionTarget(currentProduction);
+    }, [currentProduction]);
+    
+    React.useEffect(() => {
+        if (currentMarketing !== undefined) setMarketingSpend(currentMarketing);
+    }, [currentMarketing]);
 
     const handleSubmit = () => {
         setIsSubmitting(true);
@@ -222,6 +238,10 @@ export default function Dashboard() {
         totalProfit: 100000, profitThisTurn: 0, inventory: 100, 
         projectedDemand: 50, price: 10, production: 50, marketing: 500
     });
+    const [orangeTeam, setOrangeTeam] = useState<TeamData>({
+        totalProfit: 100000, profitThisTurn: 0, inventory: 100, 
+        projectedDemand: 50, price: 10, production: 50, marketing: 500
+    });
     
     // Chart data
     const [productionHistory, setProductionHistory] = useState<any[]>([]);
@@ -273,6 +293,7 @@ export default function Dashboard() {
 
             ws.onmessage = (event) => {
                 const data = JSON.parse(event.data);
+                console.log("📡 Raw data received:", data);
                 
                 setCurrentTurn(data.turn || 0);
                 
@@ -284,8 +305,8 @@ export default function Dashboard() {
                     projectedDemand: data.green_team_projected_demand || 50,
                     actualDemand: data.green_team_actual_demand,
                     price: data.green_team_price || 10,
-                    production: data.green_team_production_target || 50,
-                    marketing: data.green_team_marketing_spend || 500
+                    production: data.green_team_production || 50,
+                    marketing: data.green_team_marketing || 500
                 });
                 
                 setBlueTeam({
@@ -295,8 +316,8 @@ export default function Dashboard() {
                     projectedDemand: data.blue_team_projected_demand || 50,
                     actualDemand: data.blue_team_actual_demand,
                     price: data.blue_team_price || 10,
-                    production: data.blue_team_production_target || 50,
-                    marketing: data.blue_team_marketing_spend || 500
+                    production: data.blue_team_production || 50,
+                    marketing: data.blue_team_marketing || 500
                 });
                 
                 if ('purple_team_profit' in data) {
@@ -307,8 +328,21 @@ export default function Dashboard() {
                         projectedDemand: data.purple_team_projected_demand || 50,
                         actualDemand: data.purple_team_actual_demand,
                         price: data.purple_team_price || 10,
-                        production: data.purple_team_production_target || 50,
-                        marketing: data.purple_team_marketing_spend || 500
+                        production: data.purple_team_production || 50,
+                        marketing: data.purple_team_marketing || 500
+                    });
+                }
+                
+                if ('orange_team_profit' in data) {
+                    setOrangeTeam({
+                        totalProfit: data.orange_team_profit || 100000,
+                        profitThisTurn: data.orange_team_profit_this_turn || 0,
+                        inventory: data.orange_team_inventory || 100,
+                        projectedDemand: data.orange_team_projected_demand || 50,
+                        actualDemand: data.orange_team_actual_demand,
+                        price: data.orange_team_price || 10,
+                        production: data.orange_team_production || 50,
+                        marketing: data.orange_team_marketing || 500
                     });
                 }
                 
@@ -317,9 +351,10 @@ export default function Dashboard() {
                     setProductionHistory(prev => {
                         const newEntry = {
                             turn: data.turn,
-                            'Human': data.green_team_production_target || 0,
-                            'Mesa MAS': data.blue_team_production_target || 0,
-                            'Temporal MAS': data.purple_team_production_target || 0
+                            'Human': data.green_team_production || 0,
+                            'Mesa MAS': data.blue_team_production || 0,
+                            'Temporal MAS': data.purple_team_production || 0,
+                            'Google ADK': data.orange_team_production || 0
                         };
                         return [...prev, newEntry].slice(-20);
                     });
@@ -338,10 +373,13 @@ export default function Dashboard() {
                 const turnLogs = data.event_log || [];
                 if (data.turn > 0) {
                     const enhancedLogs = [...turnLogs];
-                    enhancedLogs.push(`Human: Price $${data.green_team_price}, Prod ${data.green_team_production_target}, Mkt $${data.green_team_marketing_spend}`);
-                    enhancedLogs.push(`Mesa: Price $${data.blue_team_price}, Prod ${data.blue_team_production_target}, Mkt $${data.blue_team_marketing_spend}`);
+                    enhancedLogs.push(`Human: Price $${data.green_team_price}, Prod ${data.green_team_production}, Mkt $${data.green_team_marketing}`);
+                    enhancedLogs.push(`Mesa: Price $${data.blue_team_price}, Prod ${data.blue_team_production}, Mkt $${data.blue_team_marketing}`);
                     if ('purple_team_profit' in data) {
-                        enhancedLogs.push(`Temporal: Price $${data.purple_team_price}, Prod ${data.purple_team_production_target}, Mkt $${data.purple_team_marketing_spend}`);
+                        enhancedLogs.push(`Temporal: Price $${data.purple_team_price}, Prod ${data.purple_team_production}, Mkt $${data.purple_team_marketing}`);
+                    }
+                    if ('orange_team_profit' in data) {
+                        enhancedLogs.push(`Google ADK: Price $${data.orange_team_price}, Prod ${data.orange_team_production}, Mkt $${data.orange_team_marketing}`);
                     }
                     setLogs(prev => [...enhancedLogs, ...prev].slice(0, 20));
                 } else {
@@ -385,9 +423,12 @@ export default function Dashboard() {
         }
     };
 
-    const isThreeTeamMode = logs.some(log => log.includes('Three-way competition')) || 
-                           'purple_team_profit' in (greenTeam as any) ||
-                           purpleTeam.totalProfit !== 100000;
+    const isFourTeamMode = logs.some(log => log.includes('Four-way competition')) || 
+                          logs.some(log => log.includes('Three-way competition')) ||
+                          'orange_team_profit' in (greenTeam as any) ||
+                          'purple_team_profit' in (greenTeam as any) ||
+                          orangeTeam.totalProfit !== 100000 ||
+                          purpleTeam.totalProfit !== 100000;
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-4">
@@ -396,7 +437,7 @@ export default function Dashboard() {
                 <div>
                     <h1 className="text-3xl font-bold text-gray-800">BrewMasters Competition</h1>
                     <p className="text-gray-600">
-                        {isThreeTeamMode ? 'Human vs Mesa MAS vs Temporal MAS' : 'Human vs MAS'} - Turn {currentTurn}
+                        {isFourTeamMode ? 'Human vs Mesa vs Temporal vs Google ADK' : 'Human vs MAS'} - Turn {currentTurn}
                     </p>
                 </div>
                 <div className="flex gap-2">
@@ -501,7 +542,7 @@ export default function Dashboard() {
             )}
 
             {/* Main Grid */}
-            <div className={`grid ${isThreeTeamMode ? 'grid-cols-3' : 'grid-cols-2'} gap-4 mb-4`}>
+            <div className={`grid ${isFourTeamMode ? 'grid-cols-4' : 'grid-cols-2'} gap-4 mb-4`}>
                 {/* Human Panel */}
                 <TeamPanel
                     title="Human Player"
@@ -518,7 +559,12 @@ export default function Dashboard() {
                     accentColor="text-green-600"
                     icon="👤"
                 >
-                    {!isCompeteMode && <Controls onSubmit={handleHumanDecision} />}
+                    {!isCompeteMode && <Controls 
+                        onSubmit={handleHumanDecision} 
+                        currentPrice={greenTeam.price}
+                        currentProduction={greenTeam.production}
+                        currentMarketing={greenTeam.marketing}
+                    />}
                     {isCompeteMode && (
                         <div className="mt-3 p-3 bg-white/30 rounded-lg border border-white/40 text-center">
                             <p className="text-sm text-green-800">AI Competition Mode Active</p>
@@ -545,7 +591,7 @@ export default function Dashboard() {
                 />
 
                 {/* Temporal MAS Panel */}
-                {isThreeTeamMode && (
+                {isFourTeamMode && (
                     <TeamPanel
                         title="Temporal MAS"
                         totalProfit={purpleTeam.totalProfit}
@@ -562,22 +608,54 @@ export default function Dashboard() {
                         icon="⚡"
                     />
                 )}
+
+                {/* Google ADK Panel */}
+                {isFourTeamMode && (
+                    <TeamPanel
+                        title="Google ADK"
+                        totalProfit={orangeTeam.totalProfit}
+                        profitThisTurn={orangeTeam.profitThisTurn}
+                        inventory={orangeTeam.inventory}
+                        projectedDemand={orangeTeam.projectedDemand}
+                        actualDemand={orangeTeam.actualDemand}
+                        price={orangeTeam.price}
+                        production={orangeTeam.production}
+                        marketing={orangeTeam.marketing}
+                        bgColor="bg-gradient-to-br from-orange-50 to-yellow-50"
+                        textColor="text-orange-800"
+                        accentColor="text-orange-600"
+                        icon="🔶"
+                    />
+                )}
             </div>
 
-            {/* Order Volume Chart and Logs Grid */}
-            <div className="grid grid-cols-2 gap-4">
-                {/* Order Volume Chart */}
-                <motion.div 
-                    className="bg-white p-4 rounded-lg shadow-xl"
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.2 }}
-                >
-                    <h2 className="text-lg font-bold mb-3 text-gray-800">Order Volume (Production Target) Over Time</h2>
+            {/* Competition Mode Controls */}
+            {isCompeteMode && (
+                <div className="mb-6 bg-white/30 rounded-lg border border-yellow-400/30">
+                    <div className="flex items-center justify-center gap-4 p-4">
+                        <button 
+                            onClick={() => {}} 
+                            className="px-6 py-2 bg-yellow-600 hover:bg-yellow-700 text-white font-bold rounded"
+                            disabled={!isConnected}
+                        >
+                            Next Turn
+                        </button>
+                        <div className="text-yellow-700 text-center">
+                            🤖 AI Battle Mode - All teams controlled by AI
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Charts */}
+            <div className="grid grid-cols-2 gap-6 mb-6">
+                {/* Sales Chart */}
+                <div className="bg-white p-4 rounded-lg shadow-xl">
+                    <h3 className="text-white text-lg font-semibold mb-4 text-gray-800">Order Volume (Production Target) Over Time</h3>
                     <p className="text-xs text-gray-600 mb-2">
                         Demonstrates bullwhip effect: MAS's predictive logic vs human reactive decisions
                     </p>
-                    <ResponsiveContainer width="100%" height={280}>
+                    <ResponsiveContainer width="100%" height={300}>
                         <LineChart data={productionHistory}>
                             <CartesianGrid strokeDasharray="3 3" />
                             <XAxis dataKey="turn" />
@@ -603,7 +681,7 @@ export default function Dashboard() {
                                 name="Mesa MAS (Predictive)"
                                 dot={{ r: 4 }}
                             />
-                            {isThreeTeamMode && (
+                            {isFourTeamMode && (
                                 <Line 
                                     type="monotone" 
                                     dataKey="Temporal MAS" 
@@ -613,25 +691,31 @@ export default function Dashboard() {
                                     dot={{ r: 4 }}
                                 />
                             )}
+                            {isFourTeamMode && (
+                                <Line 
+                                    type="monotone" 
+                                    dataKey="Google ADK" 
+                                    stroke="#ea580c" 
+                                    strokeWidth={2}
+                                    name="Google ADK"
+                                    dot={{ r: 4 }}
+                                />
+                            )}
                         </LineChart>
                     </ResponsiveContainer>
-                </motion.div>
+                </div>
 
                 {/* Event Log */}
-                <motion.div 
-                    className="bg-gray-900 text-white p-4 rounded-lg shadow-xl h-full"
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.4 }}
-                >
+                <div className="bg-gray-900 text-white p-4 rounded-lg shadow-xl h-full">
                     <h2 className="text-lg font-bold mb-2 text-gray-200">📋 Event Log</h2>
-                    <div className="h-[250px] overflow-y-auto font-mono text-sm space-y-1">
+                    <div className="h-[300px] overflow-y-auto font-mono text-sm space-y-1">
                         <AnimatePresence>
                             {logs.map((log, index) => {
                                 let textColor = 'text-gray-300';
                                 if (log.includes('Human:') || log.includes('Human Actual:')) textColor = 'text-green-400';
                                 else if (log.includes('Mesa:') || log.includes('Mesa Actual:')) textColor = 'text-blue-400';
                                 else if (log.includes('Temporal:') || log.includes('Temporal Actual:')) textColor = 'text-purple-400';
+                                else if (log.includes('Google ADK:') || log.includes('ADK:')) textColor = 'text-orange-400';
                                 else if (log.includes('Turn')) textColor = 'text-yellow-400';
                                 else if (log.includes('Market sentiment:')) textColor = 'text-orange-400';
                                 else if (log.includes('🏆')) textColor = 'text-yellow-300';
@@ -650,7 +734,7 @@ export default function Dashboard() {
                             })}
                         </AnimatePresence>
                     </div>
-                </motion.div>
+                </div>
             </div>
         </div>
     );
