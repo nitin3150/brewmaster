@@ -1,6 +1,36 @@
+# requirements.txt - Multi-Framework BrewMasters with Gemini AI
+
+# Core web framework dependencies
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+websockets==12.0
+python-dotenv==1.0.0
+
+# Essential data processing (REQUIRED)
+numpy==1.26.2
+pandas==2.1.4
+
+# Gemini AI integration
+google-generativeai==0.3.2
+
+# Mesa Framework dependencies
 Mesa==2.2.1
-numpy
-websockets
-gunicorn
-fastapi
-uvicorn
+
+# CORS and middleware
+python-multipart==0.0.6
+
+# Optional: Temporal Framework dependencies
+# Uncomment if you want real Temporal workflows (otherwise uses mock):
+# temporalio==1.4.0
+# grpcio==1.60.0
+
+# Optional: Google Cloud dependencies  
+# Uncomment if you want real Google Cloud services (otherwise uses mock):
+# google-cloud-aiplatform==1.38.1
+# google-cloud-bigquery==3.13.0
+# google-cloud-automl==2.11.4
+
+# Development dependencies (optional)
+# pytest==7.4.3
+# black==23.11.0
+# flake8==6.1.0
