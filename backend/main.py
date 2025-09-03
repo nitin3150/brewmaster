@@ -1,856 +1,658 @@
-# import asyncio
-# import json
-# import os
-# import random
-# from typing import Dict, Any, Optional
-# from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-# from fastapi.middleware.cors import CORSMiddleware
-# import uvicorn
-# from dotenv import load_dotenv
-
-# load_dotenv()
-
-# try:
-#     import google.generativeai as genai
-#     GEMINI_AVAILABLE = True
-#     print("✅ Gemini AI available")
-# except ImportError:
-#     GEMINI_AVAILABLE = False
-#     print("⚠️ Gemini AI not available - using fallbacks")
-
-# class SimplifiedGeminiHelper:
-#     """Simplified Gemini helper that just works"""
-    
-#     def __init__(self, api_key: Optional[str] = None):
-#         self.enabled = False
-#         self.model = None
-        
-#         if api_key and GEMINI_AVAILABLE:
-#             try:
-#                 genai.configure(api_key=api_key)
-#                 self.model = genai.GenerativeModel('gemini-1.5-flash')
-#                 self.enabled = True
-#                 print("✅ Gemini AI initialized successfully")
-#             except Exception as e:
-#                 print(f"❌ Gemini AI failed: {e}")
-#                 self.enabled = False
-#         else:
-#             print("⚠️ Gemini AI disabled (no API key or SDK unavailable)")
-    
-#     async def make_decision(self, framework: str, context: Dict[str, Any]) -> Dict[str, Any]:
-#         """Make AI-enhanced or fallback decision"""
-#         if self.enabled:
-#             try:
-#                 return await self._ai_decision(framework, context)
-#             except Exception as e:
-#                 print(f"AI decision failed for {framework}: {e}")
-#                 return self._fallback_decision(framework, context)
-#         else:
-#             return self._fallback_decision(framework, context)
-    
-#     async def _ai_decision(self, framework: str, context: Dict[str, Any]) -> Dict[str, Any]:
-#         """Get AI decision from Gemini"""
-#         prompt = f"""
-# You are a {framework.upper()} AI system making brewery business decisions.
-
-# Current Situation:
-# - Inventory: {context.get('inventory', 100)} units  
-# - Current Price: ${context.get('current_price', 10.0):.2f}
-# - Competitor Prices: {context.get('competitor_prices', [10.0])}
-# - Turn: {context.get('turn', 1)}
-
-# Make strategic decisions for price (8.0-15.0), production (10-150), and marketing (0-2000).
-
-# Framework approach:
-# - Mesa: Multi-agent coordination with specialized agents
-# - Temporal: Workflow-based sequential decision making  
-# - Google ADK: ML-driven optimization with advanced analytics
-
-# Respond only in JSON:
-# {{"price": 10.50, "production": 60, "marketing": 800, "reasoning": "Strategy explanation"}}
-# """
-        
-#         response = await asyncio.get_event_loop().run_in_executor(
-#             None, lambda: self.model.generate_content(prompt)
-#         )
-        
-#         # Parse response
-#         import re
-#         json_match = re.search(r'\{.*\}', response.text, re.DOTALL)
-#         if json_match:
-#             data = json.loads(json_match.group())
-            
-#             # Validate and constrain
-#             price = max(8.0, min(15.0, float(data.get('price', 10))))
-#             production = max(10, min(150, int(data.get('production', 50))))
-#             marketing = max(0, min(2000, int(data.get('marketing', 500))))
-            
-#             return {
-#                 'price': round(price, 2),
-#                 'production': production,
-#                 'marketing': marketing,
-#                 'reasoning': f"{framework.upper()} AI: {data.get('reasoning', 'Strategic decision')}",
-#                 'ai_enhanced': True,
-#                 'framework': framework
-#             }
-#         else:
-#             raise ValueError("No valid JSON in response")
-    
-#     def _fallback_decision(self, framework: str, context: Dict[str, Any]) -> Dict[str, Any]:
-#         """Smart fallback decisions based on framework characteristics"""
-#         inventory = context.get('inventory', 100)
-#         competitors = context.get('competitor_prices', [10.0])
-#         avg_competitor = sum(competitors) / len(competitors)
-        
-#         # Framework-specific strategic approaches
-#         if framework == "mesa":
-#             # Mesa: Agent-based coordination with specialization
-#             if inventory > 150:
-#                 # High inventory - pricing agent suggests discount, marketing agent boosts spend
-#                 price = max(8.0, avg_competitor - random.uniform(0.8, 1.2))
-#                 production = random.randint(20, 40)
-#                 marketing = random.randint(1200, 1800)
-#                 strategy = "Mesa agents coordinate: discount pricing + heavy marketing"
-#             elif inventory < 50:
-#                 # Low inventory - pricing agent suggests premium, production agent increases
-#                 price = min(15.0, avg_competitor + random.uniform(0.5, 1.0))
-#                 production = random.randint(100, 140)
-#                 marketing = random.randint(200, 500)
-#                 strategy = "Mesa agents coordinate: premium pricing + boost production"
-#             else:
-#                 # Balanced - agents find middle ground
-#                 price = avg_competitor + random.uniform(-0.3, 0.3)
-#                 production = random.randint(50, 80)
-#                 marketing = random.randint(600, 1000)
-#                 strategy = "Mesa agents coordinate: balanced approach"
-                
-#         elif framework == "temporal":
-#             # Temporal: Sequential workflow activities
-#             if inventory > 150:
-#                 # Workflow: Analysis → Clearance Strategy → Execution
-#                 price = max(8.0, avg_competitor - random.uniform(1.0, 1.5))
-#                 production = random.randint(15, 35)
-#                 marketing = random.randint(1400, 2000)
-#                 strategy = "Temporal workflow: Analysis→Clearance→Execute"
-#             elif inventory < 50:
-#                 # Workflow: Analysis → Growth Strategy → Execution  
-#                 price = min(15.0, avg_competitor + random.uniform(0.8, 1.3))
-#                 production = random.randint(110, 150)
-#                 marketing = random.randint(150, 400)
-#                 strategy = "Temporal workflow: Analysis→Growth→Execute"
-#             else:
-#                 # Workflow: Analysis → Optimization → Execution
-#                 price = avg_competitor + random.uniform(-0.4, 0.4)
-#                 production = random.randint(60, 90)
-#                 marketing = random.randint(700, 1100)
-#                 strategy = "Temporal workflow: Analysis→Optimize→Execute"
-                
-#         elif framework == "google_adk":
-#             # Google ADK: ML/Cloud optimization
-#             if inventory > 150:
-#                 # ML models predict optimal clearance strategy
-#                 price = max(8.0, avg_competitor - random.uniform(1.2, 1.8))
-#                 production = random.randint(10, 30)
-#                 marketing = random.randint(1500, 2000)
-#                 strategy = "ML models: Predictive clearance optimization"
-#             elif inventory < 50:
-#                 # ML models predict growth opportunity
-#                 price = min(15.0, avg_competitor + random.uniform(1.0, 1.5))
-#                 production = random.randint(120, 150)
-#                 marketing = random.randint(100, 350)
-#                 strategy = "ML models: Predictive growth optimization"
-#             else:
-#                 # ML ensemble optimization
-#                 price_variance = random.uniform(0.7, 1.3)
-#                 price = avg_competitor * price_variance
-#                 production = random.randint(70, 100)
-#                 marketing = random.randint(800, 1200)
-#                 strategy = "ML ensemble: Multi-objective optimization"
-#         else:
-#             # Generic fallback
-#             price, production, marketing = 10.0, 50, 500
-#             strategy = "Basic fallback strategy"
-        
-#         return {
-#             'price': round(max(8.0, min(15.0, price)), 2),
-#             'production': max(10, min(150, production)),
-#             'marketing': max(0, min(2000, marketing)),
-#             'reasoning': f"{framework.upper()}: {strategy} (fallback)",
-#             'ai_enhanced': False,
-#             'framework': framework
-#         }
-
-# class BrewMastersCoordinator:
-#     """Main coordinator for all three frameworks"""
-    
-#     def __init__(self, gemini_api_key: Optional[str] = None):
-#         self.ai_helper = SimplifiedGeminiHelper(gemini_api_key)
-#         self.turn = 0
-#         self.competition_mode = False
-        
-#         # Initialize all teams
-#         self.teams = {
-#             'green': {
-#                 'name': 'Human Player',
-#                 'profit': 100000,
-#                 'inventory': 100,
-#                 'price': 10.0,
-#                 'production': 50,
-#                 'marketing': 500,
-#                 'profit_this_turn': 0
-#             },
-#             'blue': {
-#                 'name': 'Mesa Multi-Agent System',
-#                 'profit': 100000,
-#                 'inventory': 100,
-#                 'price': 10.0,
-#                 'production': 50,
-#                 'marketing': 500,
-#                 'profit_this_turn': 0
-#             },
-#             'purple': {
-#                 'name': 'Temporal Workflow System',
-#                 'profit': 100000,
-#                 'inventory': 100,
-#                 'price': 10.0,
-#                 'production': 50,
-#                 'marketing': 500,
-#                 'profit_this_turn': 0
-#             },
-#             'orange': {
-#                 'name': 'Google ADK ML System',
-#                 'profit': 100000,
-#                 'inventory': 100,
-#                 'price': 10.0,
-#                 'production': 50,
-#                 'marketing': 500,
-#                 'profit_this_turn': 0
-#             }
-#         }
-        
-#         self.event_log = [
-#             "🎮 Multi-Framework BrewMasters Started!",
-#             f"🤖 AI Status: {'Enhanced with Gemini' if self.ai_helper.enabled else 'Fallback Mode'}",
-#             "🔧 Frameworks Active: Mesa MAS + Temporal Workflows + Google ADK ML",
-#             "⚔️ Ready for epic framework battles!"
-#         ]
-        
-#         print("✅ BrewMasters Coordinator initialized successfully")
-    
-#     async def process_turn(self, human_decisions: Dict[str, Any]) -> Dict[str, Any]:
-#         """Process complete turn for all frameworks"""
-#         self.turn += 1
-        
-#         # Process human team
-#         human_team = self.teams['green']
-#         human_team.update({
-#             'price': float(human_decisions.get('price', 10)),
-#             'production': int(human_decisions.get('productionTarget', 50)),
-#             'marketing': int(human_decisions.get('marketingSpend', 500))
-#         })
-        
-#         # Prepare context for AI frameworks
-#         base_context = {
-#             'turn': self.turn,
-#             'competitor_prices': [team['price'] for team in self.teams.values()],
-#         }
-        
-#         # Process each AI framework
-#         frameworks = [
-#             ('blue', 'mesa'),
-#             ('purple', 'temporal'),
-#             ('orange', 'google_adk')
-#         ]
-        
-#         framework_decisions = {}
-#         for color, framework_name in frameworks:
-#             context = base_context.copy()
-#             context.update({
-#                 'inventory': self.teams[color]['inventory'],
-#                 'current_price': self.teams[color]['price']
-#             })
-            
-#             # Get AI decision
-#             decision = await self.ai_helper.make_decision(framework_name, context)
-#             framework_decisions[framework_name] = decision
-            
-#             # Update team
-#             self.teams[color].update({
-#                 'price': decision['price'],
-#                 'production': decision['production'],
-#                 'marketing': decision['marketing']
-#             })
-        
-#         # Calculate results for all teams
-#         turn_results = {}
-#         for color, team in self.teams.items():
-#             demand = self._calculate_demand(team['price'], team['marketing'])
-#             sales = min(demand, team['inventory'])
-#             revenue = sales * team['price']
-#             costs = (team['production'] * 3.5 + 
-#                     team['marketing'] + 
-#                     team['inventory'] * 0.5)
-#             profit_this_turn = revenue - costs
-            
-#             # Update team
-#             team['inventory'] = max(0, team['inventory'] - sales + team['production'])
-#             team['profit'] += profit_this_turn
-#             team['profit_this_turn'] = profit_this_turn
-            
-#             turn_results[color] = {
-#                 'sales': sales,
-#                 'demand': demand,
-#                 'profit_this_turn': profit_this_turn
-#             }
-        
-#         # Determine best performer
-#         ai_performances = [
-#             ('Mesa', turn_results['blue']['profit_this_turn']),
-#             ('Temporal', turn_results['purple']['profit_this_turn']),
-#             ('Google ADK', turn_results['orange']['profit_this_turn'])
-#         ]
-#         best_ai = max(ai_performances, key=lambda x: x[1])
-        
-#         # Update event log
-#         self.event_log = [
-#             f"📊 Turn {self.turn} - Framework Battle Results",
-#             f"👤 Human: ${human_team['price']:.2f} → {turn_results['green']['sales']} sales, ${turn_results['green']['profit_this_turn']:+.0f} profit",
-#             f"🤖 Mesa: ${self.teams['blue']['price']:.2f} → {turn_results['blue']['sales']} sales, ${turn_results['blue']['profit_this_turn']:+.0f} profit",
-#             f"⚡ Temporal: ${self.teams['purple']['price']:.2f} → {turn_results['purple']['sales']} sales, ${turn_results['purple']['profit_this_turn']:+.0f} profit", 
-#             f"🧠 Google ADK: ${self.teams['orange']['price']:.2f} → {turn_results['orange']['sales']} sales, ${turn_results['orange']['profit_this_turn']:+.0f} profit",
-#             f"🏆 Best AI This Turn: {best_ai[0]} (${best_ai[1]:+.0f})",
-#             f"💡 AI Mode: {'Gemini Enhanced' if self.ai_helper.enabled else 'Smart Fallbacks'}"
-#         ]
-        
-#         return self.get_game_state()
-    
-#     def _calculate_demand(self, price: float, marketing: int) -> int:
-#         """Calculate market demand"""
-#         base_demand = 50
-#         marketing_boost = (marketing / 500) * 15
-#         price_effect = (10 - price) * 5
-#         random_factor = random.randint(-10, 10)
-        
-#         demand = int(base_demand + marketing_boost + price_effect + random_factor)
-#         return max(10, min(120, demand))
-    
-#     def get_game_state(self) -> Dict[str, Any]:
-#         """Get current game state in expected format"""
-#         state = {
-#             'turn': self.turn,
-#             'competition_mode': self.competition_mode,
-#             'event_log': self.event_log
-#         }
-        
-#         # Add team data in expected format
-#         for color, team in self.teams.items():
-#             prefix = f"{color}_team"
-#             for key, value in team.items():
-#                 if key != 'name':  # Exclude name from state
-#                     state[f"{prefix}_{key}"] = value
-        
-#         return state
-    
-#     async def run_competition(self, websocket: WebSocket, turns: int):
-#         """Run AI framework competition"""
-#         self.competition_mode = True
-        
-#         for turn_num in range(turns):
-#             if not self.competition_mode:
-#                 break
-            
-#             # Human team frozen during competition
-#             mock_human_decisions = {
-#                 'price': 10.0,
-#                 'productionTarget': 50,
-#                 'marketingSpend': 500
-#             }
-            
-#             # Process turn
-#             updated_state = await self.process_turn(mock_human_decisions)
-            
-#             # Send progress update
-#             progress = ((turn_num + 1) / turns) * 100
-#             response = updated_state.copy()
-#             response.update({
-#                 'compete_progress': progress,
-#                 'compete_complete': (turn_num + 1 == turns),
-#                 'competition_turn': turn_num + 1
-#             })
-            
-#             await websocket.send_text(json.dumps(response))
-#             await asyncio.sleep(0.8)  # Pause for visualization
-        
-#         self.competition_mode = False
-        
-#         # Send final results
-#         final_profits = {
-#             'Mesa': self.teams['blue']['profit'],
-#             'Temporal': self.teams['purple']['profit'],
-#             'Google ADK': self.teams['orange']['profit']
-#         }
-#         winner = max(final_profits.items(), key=lambda x: x[1])
-        
-#         final_response = self.get_game_state()
-#         final_response.update({
-#             'event_log': [
-#                 "🏆 FRAMEWORK COMPETITION COMPLETE!",
-#                 f"🥇 Champion: {winner[0]} with ${winner[1]:,.0f} total profit!",
-#                 "",
-#                 "📊 Final Standings:",
-#                 *[f"  {name}: ${profit:,.0f}" for name, profit in 
-#                   sorted(final_profits.items(), key=lambda x: x[1], reverse=True)],
-#                 "",
-#                 f"⚔️ Battle Duration: {turns} turns",
-#                 f"🤖 AI Mode: {'Gemini Enhanced' if self.ai_helper.enabled else 'Smart Fallbacks'}"
-#             ],
-#             'compete_progress': 100,
-#             'compete_complete': True,
-#             'competition_results': final_profits,
-#             'winner': winner[0]
-#         })
-        
-#         await websocket.send_text(json.dumps(final_response))
-
-# # FastAPI Application
-# app = FastAPI(title="BrewMasters Multi-Framework Battle")
-
-# app.add_middleware(
-#     CORSMiddleware,
-#     allow_origins=["*"],
-#     allow_credentials=True,
-#     allow_methods=["*"],
-#     allow_headers=["*"],
-# )
-
-# # Global coordinator
-# coordinator: Optional[BrewMastersCoordinator] = None
-
-# @app.websocket("/ws")
-# async def websocket_endpoint(websocket: WebSocket):
-#     await websocket.accept()
-#     print("🔌 Client connected")
-    
-#     global coordinator
-#     if coordinator is None:
-#         gemini_api_key = os.getenv("GEMINI_API_KEY")
-#         coordinator = BrewMastersCoordinator(gemini_api_key)
-    
-#     try:
-#         # Send initial state
-#         initial_state = coordinator.get_game_state()
-#         initial_state['server_info'] = {
-#             'version': '2.1.0',
-#             'frameworks': ['Mesa MAS', 'Temporal Workflows', 'Google ADK ML'],
-#             'ai_enabled': coordinator.ai_helper.enabled
-#         }
-#         await websocket.send_text(json.dumps(initial_state))
-        
-#         async for message in websocket.iter_text():
-#             try:
-#                 data = json.loads(message)
-                
-#                 # Handle commands
-#                 if data.get('restart'):
-#                     coordinator = BrewMastersCoordinator(coordinator.ai_helper.model is not None)
-#                     await websocket.send_text(json.dumps(coordinator.get_game_state()))
-#                     continue
-                
-#                 if data.get('compete'):
-#                     turns = data.get('turns', 10)
-#                     asyncio.create_task(coordinator.run_competition(websocket, turns))
-#                     continue
-                
-#                 if data.get('stopCompete'):
-#                     coordinator.competition_mode = False
-#                     continue
-                
-#                 # Normal turn processing
-#                 if not coordinator.competition_mode:
-#                     updated_state = await coordinator.process_turn(data)
-#                     await websocket.send_text(json.dumps(updated_state))
-#                 else:
-#                     await websocket.send_text(json.dumps({
-#                         "message": "Turn ignored - competition in progress"
-#                     }))
-                
-#             except json.JSONDecodeError as e:
-#                 await websocket.send_text(json.dumps({"error": f"Invalid JSON: {e}"}))
-#             except Exception as e:
-#                 print(f"❌ Error: {e}")
-#                 await websocket.send_text(json.dumps({"error": str(e)}))
-    
-#     except WebSocketDisconnect:
-#         print("🔌 Client disconnected")
-#     except Exception as e:
-#         print(f"❌ WebSocket error: {e}")
-
-# @app.get("/")
-# async def read_root():
-#     return {
-#         "message": "🎮 BrewMasters Multi-Framework Battle Arena",
-#         "version": "2.1.0",
-#         "status": "Ready for battle!",
-#         "frameworks": {
-#             "mesa": "Multi-Agent System with specialized coordination",
-#             "temporal": "Workflow orchestration with sequential activities",
-#             "google_adk": "ML/Cloud optimization with predictive analytics"
-#         },
-#         "ai_status": coordinator.ai_helper.enabled if coordinator else "Not initialized"
-#     }
-
-# @app.get("/status")
-# async def get_status():
-#     if not coordinator:
-#         return {"status": "not_initialized"}
-    
-#     return {
-#         "status": "ready",
-#         "turn": coordinator.turn,
-#         "competition_mode": coordinator.competition_mode,
-#         "ai_enabled": coordinator.ai_helper.enabled,
-#         "teams": {
-#             color: {
-#                 "name": team["name"],
-#                 "profit": team["profit"],
-#                 "inventory": team["inventory"]
-#             }
-#             for color, team in coordinator.teams.items()
-#         }
-#     }
-
-# if __name__ == "__main__":
-#     print("🚀 Starting BrewMasters Multi-Framework Battle Arena...")
-#     print("🔧 Frameworks: Mesa MAS + Temporal Workflows + Google ADK ML")
-#     print("🤖 Gemini AI integration with smart fallbacks")
-#     print("⚔️ Ready for epic framework battles!")
-    
-#     # Check for Gemini API key
-#     gemini_key = os.getenv("GEMINI_API_KEY")
-#     if gemini_key and gemini_key != "your_gemini_api_key_here":
-#         print("✅ Gemini API key detected - AI features enabled")
-#     else:
-#         print("⚠️ No Gemini API key - using smart fallback strategies")
-#         print("💡 Set GEMINI_API_KEY environment variable for AI enhancement")
-    
-#     print("🌐 Starting server on http://localhost:8000")
-#     uvicorn.run(app, host="0.0.0.0", port=8000)
-
 import asyncio
 import json
 import os
 import random
-import sys
-from typing import Dict, Any, Optional
+import re
+from typing import Dict, Any, Optional, List
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
-from dotenv import load_dotenv
 
-load_dotenv()
-
-# Better Gemini import detection
-GEMINI_AVAILABLE = False
-genai = None
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
 
 try:
     import google.generativeai as genai
     GEMINI_AVAILABLE = True
-    print("✅ Gemini AI library imported successfully")
-except ImportError as e:
-    print(f"⚠️ Gemini AI not available: {e}")
-    print("💡 Install with: pip install google-generativeai")
-except Exception as e:
-    print(f"❌ Unexpected error importing Gemini: {e}")
+    print("Gemini AI library available")
+except ImportError:
+    GEMINI_AVAILABLE = False
+    print("Gemini AI not available - using rule-based decisions")
 
-class EnhancedGeminiHelper:
-    """Enhanced Gemini helper with better error handling and debugging"""
+class AgentConfig:
+    """Enhanced configuration with profit optimization focus"""
+    MIN_PRICE = 8.0
+    MAX_PRICE = 15.0
+    MIN_PRODUCTION = 10
+    MAX_PRODUCTION = 150
+    MIN_MARKETING = 0
+    MAX_MARKETING = 2000
+    UNIT_PRODUCTION_COST = 3.5  # Actual production cost per unit
+    UNIT_HOLDING_COST = 0.5     # Cost to hold inventory per unit per turn
+    TARGET_PROFIT_MARGIN = 0.40  # Target 40% profit margin
+    DESIRED_INVENTORY_WEEKS = 2.5
+    MIN_PROFITABLE_PRICE = UNIT_PRODUCTION_COST / (1 - TARGET_PROFIT_MARGIN)  # ~$5.83
+
+class HistoricalDataTracker:
+    """Tracks historical data for all teams"""
+    
+    def __init__(self):
+        self.team_histories = {
+            'green': {'sales': [], 'production': [], 'prices': [], 'marketing': [], 'profits': [], 'inventory': []},
+            'blue': {'sales': [], 'production': [], 'prices': [], 'marketing': [], 'profits': [], 'inventory': []},
+            'purple': {'sales': [], 'production': [], 'prices': [], 'marketing': [], 'profits': [], 'inventory': []},
+            'orange': {'sales': [], 'production': [], 'prices': [], 'marketing': [], 'profits': [], 'inventory': []}
+        }
+        self.market_history = []  # Overall market trends
+    
+    def add_turn_data(self, turn: int, teams: Dict[str, Dict[str, Any]], turn_results: Dict[str, Dict[str, Any]]):
+        """Add data from completed turn"""
+        for color, team in teams.items():
+            if color in self.team_histories:
+                self.team_histories[color]['sales'].append(turn_results[color]['sales'])
+                self.team_histories[color]['production'].append(team['production'])
+                self.team_histories[color]['prices'].append(team['price'])
+                self.team_histories[color]['marketing'].append(team['marketing'])
+                self.team_histories[color]['profits'].append(turn_results[color]['profit_this_turn'])
+                self.team_histories[color]['inventory'].append(team['inventory'])
+                
+                # Keep only last 10 turns of history
+                for key in self.team_histories[color]:
+                    if len(self.team_histories[color][key]) > 10:
+                        self.team_histories[color][key] = self.team_histories[color][key][-10:]
+        
+        # Track overall market data
+        total_sales = sum(turn_results[color]['sales'] for color in teams.keys())
+        avg_price = sum(team['price'] for team in teams.values()) / len(teams)
+        
+        self.market_history.append({
+            'turn': turn,
+            'total_market_sales': total_sales,
+            'average_market_price': avg_price
+        })
+        
+        if len(self.market_history) > 10:
+            self.market_history = self.market_history[-10:]
+    
+    def get_team_history(self, team_color: str) -> Dict[str, List]:
+        """Get historical data for a specific team"""
+        return self.team_histories.get(team_color, {})
+    
+    def get_market_trends(self) -> Dict[str, Any]:
+        """Get market trend analysis"""
+        if len(self.market_history) < 3:
+            return {'trend': 'insufficient_data'}
+        
+        recent_sales = [h['total_market_sales'] for h in self.market_history[-3:]]
+        sales_trend = 'growing' if recent_sales[-1] > recent_sales[0] + 10 else 'declining' if recent_sales[-1] < recent_sales[0] - 10 else 'stable'
+        
+        recent_prices = [h['average_market_price'] for h in self.market_history[-3:]]
+        price_trend = 'increasing' if recent_prices[-1] > recent_prices[0] + 0.5 else 'decreasing' if recent_prices[-1] < recent_prices[0] - 0.5 else 'stable'
+        
+        return {
+            'sales_trend': sales_trend,
+            'price_trend': price_trend,
+            'market_volatility': self._calculate_volatility(recent_sales)
+        }
+    
+    def _calculate_volatility(self, data: List[float]) -> str:
+        """Calculate volatility level"""
+        if len(data) < 2:
+            return 'unknown'
+        
+        avg = sum(data) / len(data)
+        variance = sum((x - avg) ** 2 for x in data) / len(data)
+        std_dev = variance ** 0.5
+        
+        volatility_ratio = std_dev / avg if avg > 0 else 0
+        
+        if volatility_ratio > 0.3:
+            return 'high'
+        elif volatility_ratio > 0.15:
+            return 'medium'
+        else:
+            return 'low'
+
+class ProfitOptimizedGeminiHelper:
+    """Enhanced Gemini helper focused on profitable decisions"""
     
     def __init__(self, api_key: Optional[str] = None):
         self.enabled = False
         self.model = None
         self.model_name = None
         
-        print(f"🔧 Initializing Gemini Helper...")
-        print(f"📦 Gemini library available: {GEMINI_AVAILABLE}")
-        print(f"🔑 API key provided: {'Yes' if api_key else 'No'}")
-        
-        if not GEMINI_AVAILABLE:
-            print("❌ Cannot initialize Gemini - library not available")
-            return
-            
-        if not api_key:
-            print("❌ Cannot initialize Gemini - no API key provided")
-            print("💡 Set GEMINI_API_KEY environment variable")
-            return
-        
-        if api_key == "your_gemini_api_key_here":
-            print("❌ Please set a real API key (not the placeholder)")
-            return
-        
-        # Try to configure and initialize Gemini
-        try:
-            print(f"🔄 Configuring Gemini with API key: {api_key[:10]}...")
-            genai.configure(api_key=api_key)
-            
-            # Try different models in order of preference
-            models_to_try = [
-                'gemini-1.5-flash',
-                'gemini-1.5-pro',
-                'gemini-pro-latest',
-                'gemini-1.0-pro'
-            ]
-            
-            for model_name in models_to_try:
-                try:
-                    print(f"🧪 Testing model: {model_name}")
-                    test_model = genai.GenerativeModel(model_name)
-                    
-                    # Quick test
-                    test_response = test_model.generate_content("Hello")
-                    if test_response and test_response.text:
-                        print(f"✅ Model {model_name} works!")
-                        self.model = test_model
-                        self.model_name = model_name
-                        self.enabled = True
-                        break
-                    else:
-                        print(f"❌ Model {model_name} returned empty response")
-                        
-                except Exception as model_error:
-                    print(f"❌ Model {model_name} failed: {model_error}")
-                    continue
-            
-            if self.enabled:
-                print(f"🎯 Successfully initialized with model: {self.model_name}")
-            else:
-                print("❌ No working models found")
+        if api_key and GEMINI_AVAILABLE:
+            try:
+                genai.configure(api_key=api_key)
+                models = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-1.0-pro']
                 
-        except Exception as e:
-            print(f"❌ Gemini initialization failed: {e}")
-            self.enabled = False
-    
-    async def make_decision(self, framework: str, context: Dict[str, Any]) -> Dict[str, Any]:
-        """Make AI-enhanced or fallback decision"""
+                for model_name in models:
+                    try:
+                        test_model = genai.GenerativeModel(model_name)
+                        test_response = test_model.generate_content("Hello")
+                        if test_response and test_response.text:
+                            self.model = test_model
+                            self.model_name = model_name
+                            self.enabled = True
+                            print(f"Profit-optimized Gemini AI enabled with {model_name}")
+                            break
+                    except Exception as e:
+                        print(f"Model {model_name} failed: {e}")
+                        continue
+                        
+            except Exception as e:
+                print(f"Gemini initialization failed: {e}")
+        
+        if not self.enabled:
+            print("Using profit-optimized rule-based decisions")
+
+    async def get_profitable_decision(self, agent_type: str, context: Dict[str, Any], 
+                                    team_history: Dict[str, List], market_trends: Dict[str, Any],
+                                    framework: str) -> Dict[str, Any]:
+        """Get profitable decision with historical context"""
+        
         if self.enabled:
             try:
-                print(f"🤖 Making AI decision for {framework}...")
-                decision = await self._ai_decision(framework, context)
-                print(f"✅ AI decision successful for {framework}")
-                return decision
+                return await self._ai_profitable_decision(agent_type, context, team_history, market_trends, framework)
             except Exception as e:
-                print(f"❌ AI decision failed for {framework}: {e}")
-                print("🔄 Falling back to rule-based decision")
-                return self._fallback_decision(framework, context)
+                print(f"AI decision failed for {agent_type}: {e}")
+                return self._profitable_fallback(agent_type, context, team_history, market_trends)
         else:
-            print(f"🔄 Using fallback decision for {framework} (AI disabled)")
-            return self._fallback_decision(framework, context)
+            return self._profitable_fallback(agent_type, context, team_history, market_trends)
     
-    async def _ai_decision(self, framework: str, context: Dict[str, Any]) -> Dict[str, Any]:
-        """Get AI decision from Gemini"""
+    async def _ai_profitable_decision(self, agent_type: str, context: Dict[str, Any], 
+                                    team_history: Dict[str, List], market_trends: Dict[str, Any], 
+                                    framework: str) -> Dict[str, Any]:
+        """AI decision with profit optimization and historical data"""
+        
+        inventory = context.get('inventory', 100)
+        current_price = context.get('current_price', 10.0)
+        competitors = context.get('competitor_prices', [10.0])
+        
+        # Calculate profit history trends
+        profit_trend = "unknown"
+        avg_recent_profit = 0
+        if len(team_history.get('profits', [])) >= 3:
+            recent_profits = team_history['profits'][-3:]
+            avg_recent_profit = sum(recent_profits) / len(recent_profits)
+            if recent_profits[-1] > recent_profits[0] + 100:
+                profit_trend = "improving"
+            elif recent_profits[-1] < recent_profits[0] - 100:
+                profit_trend = "declining"
+            else:
+                profit_trend = "stable"
+        
         prompt = f"""
-You are a {framework.upper()} AI system making brewery business decisions.
+You are a PROFIT-FOCUSED {agent_type.upper()} agent in a {framework.upper()} framework.
 
-Current Situation:
-- Inventory: {context.get('inventory', 100)} units  
-- Current Price: ${context.get('current_price', 10.0):.2f}
-- Competitor Prices: {context.get('competitor_prices', [10.0])}
+CRITICAL REQUIREMENT: Your decisions MUST be profitable. Avoid losses at all costs.
+
+CURRENT SITUATION:
+- Inventory: {inventory} units
+- Current Price: ${current_price:.2f}
+- Competitor Prices: {competitors}
 - Turn: {context.get('turn', 1)}
 
-Make strategic decisions for price (8.0-15.0), production (10-150), and marketing (0-2000).
+HISTORICAL PERFORMANCE DATA:
+- Sales History (last 5 turns): {team_history.get('sales', [])[-5:]}
+- Price History: {team_history.get('prices', [])[-5:]}
+- Marketing History: {team_history.get('marketing', [])[-5:]}
+- Profit History: {team_history.get('profits', [])[-5:]}
+- Inventory History: {team_history.get('inventory', [])[-5:]}
+- Recent Profit Trend: {profit_trend}
+- Average Recent Profit: ${avg_recent_profit:.0f}
 
-Framework approach:
-- Mesa: Multi-agent coordination with specialized agents
-- Temporal: Workflow-based sequential decision making  
-- Google ADK: ML-driven optimization with advanced analytics
+MARKET TRENDS:
+- Sales Trend: {market_trends.get('sales_trend', 'stable')}
+- Price Trend: {market_trends.get('price_trend', 'stable')}
+- Market Volatility: {market_trends.get('market_volatility', 'medium')}
 
-Respond only in JSON format:
-{{"price": 10.50, "production": 60, "marketing": 800, "reasoning": "Strategy explanation"}}
+PROFIT OPTIMIZATION RULES:
+- Minimum Profitable Price: ${AgentConfig.MIN_PROFITABLE_PRICE:.2f} (covers costs + target margin)
+- Production Cost: ${AgentConfig.UNIT_PRODUCTION_COST}/unit
+- Holding Cost: ${AgentConfig.UNIT_HOLDING_COST}/unit/turn
+- Target Profit Margin: {AgentConfig.TARGET_PROFIT_MARGIN*100}%
+
+DECISION CONSTRAINTS:
+- Price: ${AgentConfig.MIN_PRICE:.2f}-${AgentConfig.MAX_PRICE:.2f}
+- Production: {AgentConfig.MIN_PRODUCTION}-{AgentConfig.MAX_PRODUCTION} units
+- Marketing: ${AgentConfig.MIN_MARKETING}-${AgentConfig.MAX_MARKETING}
+
+PROFIT ANALYSIS FROM HISTORY:
+- If recent profits are negative, prioritize cost reduction and price optimization
+- If recent profits are declining, analyze what changed and reverse the trend
+- Use successful patterns from profitable periods
+- Learn from competitor pricing and market response
+
+STRATEGIC FOCUS BY AGENT:
+- PRICING: Set prices that ensure profitability while remaining competitive
+- PRODUCTION: Produce quantities that minimize costs while meeting demand
+- MARKETING: Spend on marketing only when ROI is clearly positive
+- CEO: Coordinate all decisions to maximize overall profitability
+
+EXAMPLE PROFITABLE STRATEGIES:
+- High inventory + losing money = Lower price slightly, reduce production significantly, increase marketing moderately
+- Low inventory + profitable = Maintain or increase price, increase production, maintain marketing
+- Competitors much cheaper + losing money = Find middle ground price, optimize production costs, targeted marketing
+
+YOUR TASK:
+Analyze the historical data and current situation to make a PROFITABLE decision.
+Learn from past performance patterns and market trends.
+Ensure positive profit contribution.
+
+RESPOND IN JSON:
+{{"price": 10.50, "production": 60, "marketing": 800, "reasoning": "Detailed profit-focused strategy based on historical analysis"}}
 """
         
-        try:
-            response = await asyncio.get_event_loop().run_in_executor(
-                None, lambda: self.model.generate_content(prompt)
-            )
+        response = await asyncio.get_event_loop().run_in_executor(
+            None, lambda: self.model.generate_content(prompt)
+        )
+        
+        json_match = re.search(r'\{.*\}', response.text, re.DOTALL)
+        if json_match:
+            data = json.loads(json_match.group())
             
-            if not response or not response.text:
-                raise ValueError("Empty response from Gemini")
+            # Ensure profitable pricing
+            proposed_price = float(data.get('price', 10))
+            min_profitable = max(AgentConfig.MIN_PROFITABLE_PRICE, AgentConfig.MIN_PRICE)
+            price = max(min_profitable, min(AgentConfig.MAX_PRICE, proposed_price))
             
-            # Parse response
-            import re
-            json_match = re.search(r'\{.*\}', response.text, re.DOTALL)
-            if json_match:
-                data = json.loads(json_match.group())
-                
-                # Validate and constrain
-                price = max(8.0, min(15.0, float(data.get('price', 10))))
-                production = max(10, min(150, int(data.get('production', 50))))
-                marketing = max(0, min(2000, int(data.get('marketing', 500))))
-                
-                return {
-                    'price': round(price, 2),
-                    'production': production,
-                    'marketing': marketing,
-                    'reasoning': f"{framework.upper()} AI ({self.model_name}): {data.get('reasoning', 'Strategic decision')}",
-                    'ai_enhanced': True,
-                    'framework': framework
-                }
-            else:
-                raise ValueError("No valid JSON in response")
-                
-        except Exception as e:
-            print(f"❌ Gemini API call failed: {e}")
-            raise  # Re-raise to trigger fallback
+            production = max(AgentConfig.MIN_PRODUCTION, min(AgentConfig.MAX_PRODUCTION, int(data.get('production', 50))))
+            marketing = max(AgentConfig.MIN_MARKETING, min(AgentConfig.MAX_MARKETING, int(data.get('marketing', 500))))
+            
+            return {
+                'price': round(price, 2),
+                'production': production,
+                'marketing': marketing,
+                'reasoning': f"{agent_type.upper()} AI: {data.get('reasoning', 'Profit-optimized decision')}",
+                'agent_type': agent_type,
+                'ai_enhanced': True,
+                'profit_focused': True
+            }
+        else:
+            raise ValueError("No JSON found in response")
     
-    def _fallback_decision(self, framework: str, context: Dict[str, Any]) -> Dict[str, Any]:
-        """Smart fallback decisions based on framework characteristics"""
+    def _profitable_fallback(self, agent_type: str, context: Dict[str, Any], 
+                           team_history: Dict[str, List], market_trends: Dict[str, Any]) -> Dict[str, Any]:
+        """Profit-focused fallback decisions using historical data"""
+        
         inventory = context.get('inventory', 100)
+        current_price = context.get('current_price', 10.0)
         competitors = context.get('competitor_prices', [10.0])
         avg_competitor = sum(competitors) / len(competitors)
         
-        # Framework-specific strategic approaches
-        if framework == "mesa":
-            # Mesa: Agent-based coordination with specialization
-            if inventory > 150:
-                price = max(8.0, avg_competitor - random.uniform(0.8, 1.2))
-                production = random.randint(20, 40)
-                marketing = random.randint(1200, 1800)
-                strategy = "Mesa agents coordinate: discount pricing + heavy marketing"
+        # Analyze profit history
+        recent_profits = team_history.get('profits', [])
+        recent_sales = team_history.get('sales', [])
+        recent_prices = team_history.get('prices', [])
+        
+        # Determine if we've been profitable
+        recently_profitable = True
+        if len(recent_profits) >= 2:
+            recently_profitable = sum(recent_profits[-2:]) > 0
+        
+        # Calculate minimum profitable price
+        min_profitable_price = max(AgentConfig.MIN_PROFITABLE_PRICE, AgentConfig.MIN_PRICE)
+        
+        if agent_type == "pricing":
+            # Pricing focused on profitability
+            if not recently_profitable:
+                # If losing money, increase price for better margins
+                price = max(min_profitable_price, min(avg_competitor + 0.5, AgentConfig.MAX_PRICE))
+                strategy = "Profit recovery: increased price to ensure margins"
+            elif inventory > 150:
+                # High inventory but need to stay profitable
+                price = max(min_profitable_price, avg_competitor - 0.3)
+                strategy = "Moderate discount while maintaining profitability"
             elif inventory < 50:
-                price = min(15.0, avg_competitor + random.uniform(0.5, 1.0))
-                production = random.randint(100, 140)
+                # Low inventory - premium pricing opportunity
+                price = min(AgentConfig.MAX_PRICE, avg_competitor + random.uniform(0.5, 1.2))
+                strategy = "Premium pricing for scarcity value"
+            else:
+                # Normal conditions - competitive but profitable
+                price = max(min_profitable_price, avg_competitor + random.uniform(-0.1, 0.3))
+                strategy = "Competitive pricing with profit protection"
+            
+            return {
+                'price': round(price, 2),
+                'reasoning': f'Pricing Agent: {strategy}',
+                'agent_type': 'pricing',
+                'ai_enhanced': False,
+                'profit_focused': True,
+                'min_profitable_price': min_profitable_price
+            }
+        
+        elif agent_type == "production":
+            # Production focused on cost efficiency
+            
+            # Analyze sales trend from history
+            expected_sales = 50  # default
+            if len(recent_sales) >= 3:
+                # Use weighted average of recent sales
+                weights = [0.2, 0.3, 0.5]
+                expected_sales = sum(sale * weight for sale, weight in zip(recent_sales[-3:], weights))
+            elif recent_sales:
+                expected_sales = sum(recent_sales) / len(recent_sales)
+            
+            # Calculate optimal inventory target
+            target_inventory = expected_sales * AgentConfig.DESIRED_INVENTORY_WEEKS
+            
+            # Calculate production need
+            inventory_gap = target_inventory - inventory
+            base_production = max(0, inventory_gap) + expected_sales
+            
+            # Adjust production based on profit history
+            if not recently_profitable:
+                # If losing money, be more conservative with production
+                production = max(AgentConfig.MIN_PRODUCTION, min(AgentConfig.MAX_PRODUCTION, int(base_production * 0.8)))
+                strategy = "Conservative production to reduce costs during profit recovery"
+            elif inventory > 150:
+                # High inventory - minimize production
+                production = max(AgentConfig.MIN_PRODUCTION, min(50, int(expected_sales * 0.7)))
+                strategy = "Minimal production to reduce holding costs"
+            else:
+                # Normal production planning
+                production = max(AgentConfig.MIN_PRODUCTION, min(AgentConfig.MAX_PRODUCTION, int(base_production)))
+                strategy = "Demand-responsive production for optimal inventory"
+            
+            return {
+                'production': production,
+                'reasoning': f'Production Agent: {strategy}',
+                'agent_type': 'production',
+                'ai_enhanced': False,
+                'profit_focused': True,
+                'expected_sales': round(expected_sales, 1),
+                'target_inventory': round(target_inventory, 1)
+            }
+        
+        elif agent_type == "marketing":
+            # Marketing focused on positive ROI
+            
+            # Analyze marketing effectiveness from history
+            marketing_effectiveness = 1.0  # default
+            if len(recent_sales) >= 2 and len(team_history.get('marketing', [])) >= 2:
+                # Simple effectiveness calculation
+                sales_change = recent_sales[-1] - recent_sales[-2] if len(recent_sales) >= 2 else 0
+                marketing_last = team_history['marketing'][-1] if team_history.get('marketing') else 500
+                if marketing_last > 0:
+                    marketing_effectiveness = max(0.3, min(2.0, 1.0 + sales_change / (marketing_last / 100)))
+            
+            # Calculate ROI-based marketing spend
+            if not recently_profitable:
+                # If losing money, reduce marketing spend
+                marketing = max(100, min(600, random.randint(200, 500)))
+                strategy = "Reduced marketing spend during profit recovery"
+            elif inventory > 150:
+                # High inventory - invest in marketing but watch ROI
+                expected_roi = (inventory * current_price * 0.1) / 1000  # Expected return per $1000 marketing
+                if expected_roi > 1.2:  # Only if ROI looks good
+                    marketing = random.randint(1000, 1500)
+                    strategy = "Increased marketing with positive ROI projection"
+                else:
+                    marketing = random.randint(600, 1000)
+                    strategy = "Moderate marketing due to uncertain ROI"
+            elif inventory < 50:
+                # Low inventory - minimal marketing
+                marketing = random.randint(100, 400)
+                strategy = "Minimal marketing due to low inventory"
+            else:
+                # Normal marketing with effectiveness adjustment
+                base_marketing = 800
+                adjusted_marketing = int(base_marketing * marketing_effectiveness)
+                marketing = max(AgentConfig.MIN_MARKETING, min(AgentConfig.MAX_MARKETING, adjusted_marketing))
+                strategy = f"ROI-optimized marketing (effectiveness: {marketing_effectiveness:.1f}x)"
+            
+            return {
+                'marketing': marketing,
+                'reasoning': f'Marketing Agent: {strategy}',
+                'agent_type': 'marketing',
+                'ai_enhanced': False,
+                'profit_focused': True,
+                'marketing_effectiveness': round(marketing_effectiveness, 2)
+            }
+        
+        else:  # CEO
+            # CEO makes profit-optimized coordinated decisions
+            
+            # Analyze overall profitability trend
+            total_recent_profit = sum(recent_profits[-3:]) if len(recent_profits) >= 3 else 0
+            
+            if total_recent_profit < -500:  # Significant losses
+                # Crisis mode: Focus on immediate profitability
+                price = max(min_profitable_price + 0.5, min(AgentConfig.MAX_PRICE, avg_competitor + 0.3))
+                production = max(AgentConfig.MIN_PRODUCTION, min(60, int(inventory * 0.3)))  # Reduce production
+                marketing = max(100, min(500, int(inventory * 2)))  # Minimal marketing
+                strategy = "Crisis management: Prioritize immediate profit recovery"
+                
+            elif total_recent_profit < 0:  # Recent losses
+                # Recovery mode: Careful profit optimization
+                price = max(min_profitable_price, avg_competitor)
+                production = max(AgentConfig.MIN_PRODUCTION, min(80, int(expected_sales * 1.2)))
+                marketing = max(200, min(800, random.randint(400, 700)))
+                strategy = "Recovery mode: Balanced approach to restore profitability"
+                
+            elif inventory > 180:  # Profitable but excess inventory
+                # Inventory management while maintaining profits
+                price = max(min_profitable_price, avg_competitor - 0.2)
+                production = AgentConfig.MIN_PRODUCTION
+                marketing = min(AgentConfig.MAX_MARKETING, random.randint(1200, 1800))
+                strategy = "Profitable inventory clearance: Maintain margins while moving stock"
+                
+            elif inventory < 40:  # Low inventory opportunity
+                # Capitalize on scarcity
+                price = min(AgentConfig.MAX_PRICE, avg_competitor + random.uniform(0.8, 1.5))
+                production = min(AgentConfig.MAX_PRODUCTION, random.randint(100, 140))
                 marketing = random.randint(200, 500)
-                strategy = "Mesa agents coordinate: premium pricing + boost production"
-            else:
-                price = avg_competitor + random.uniform(-0.3, 0.3)
-                production = random.randint(50, 80)
-                marketing = random.randint(600, 1000)
-                strategy = "Mesa agents coordinate: balanced approach"
+                strategy = "Scarcity premium: Maximize margins with limited supply"
                 
-        elif framework == "temporal":
-            # Temporal: Sequential workflow activities
-            if inventory > 150:
-                price = max(8.0, avg_competitor - random.uniform(1.0, 1.5))
-                production = random.randint(15, 35)
-                marketing = random.randint(1400, 2000)
-                strategy = "Temporal workflow: Analysis→Clearance→Execute"
-            elif inventory < 50:
-                price = min(15.0, avg_competitor + random.uniform(0.8, 1.3))
-                production = random.randint(110, 150)
-                marketing = random.randint(150, 400)
-                strategy = "Temporal workflow: Analysis→Growth→Execute"
-            else:
-                price = avg_competitor + random.uniform(-0.4, 0.4)
-                production = random.randint(60, 90)
-                marketing = random.randint(700, 1100)
-                strategy = "Temporal workflow: Analysis→Optimize→Execute"
-                
-        elif framework == "google_adk":
-            # Google ADK: ML/Cloud optimization
-            if inventory > 150:
-                price = max(8.0, avg_competitor - random.uniform(1.2, 1.8))
-                production = random.randint(10, 30)
-                marketing = random.randint(1500, 2000)
-                strategy = "ML models: Predictive clearance optimization"
-            elif inventory < 50:
-                price = min(15.0, avg_competitor + random.uniform(1.0, 1.5))
-                production = random.randint(120, 150)
-                marketing = random.randint(100, 350)
-                strategy = "ML models: Predictive growth optimization"
-            else:
-                price_variance = random.uniform(0.7, 1.3)
-                price = avg_competitor * price_variance
-                production = random.randint(70, 100)
-                marketing = random.randint(800, 1200)
-                strategy = "ML ensemble: Multi-objective optimization"
-        else:
-            price, production, marketing = 10.0, 50, 500
-            strategy = "Basic fallback strategy"
-        
-        mode = "Rule-based Fallback" if self.enabled else "Rule-based (No AI)"
-        
-        return {
-            'price': round(max(8.0, min(15.0, price)), 2),
-            'production': max(10, min(150, production)),
-            'marketing': max(0, min(2000, marketing)),
-            'reasoning': f"{framework.upper()}: {strategy} ({mode})",
-            'ai_enhanced': False,
-            'framework': framework
-        }
+            else:  # Normal profitable operations
+                # Optimize for sustained profitability
+                price = max(min_profitable_price, avg_competitor + random.uniform(-0.1, 0.4))
+                production = random.randint(50, 90)
+                marketing = random.randint(600, 1100)
+                strategy = "Sustainable profitability: Balanced optimization"
+            
+            # Calculate expected profit for validation
+            expected_demand = 50 + (marketing / 500) * 15 + (10 - price) * 5
+            expected_sales = min(expected_demand, inventory + production)
+            expected_revenue = expected_sales * price
+            expected_costs = production * AgentConfig.UNIT_PRODUCTION_COST + marketing + inventory * AgentConfig.UNIT_HOLDING_COST
+            expected_profit = expected_revenue - expected_costs
+            
+            # If expected profit is negative, adjust strategy
+            if expected_profit < 0:
+                print(f"Adjusting {agent_type} decision - expected profit was negative")
+                price = min(AgentConfig.MAX_PRICE, price + 0.5)  # Increase price
+                production = max(AgentConfig.MIN_PRODUCTION, int(production * 0.8))  # Reduce production
+                marketing = max(AgentConfig.MIN_MARKETING, int(marketing * 0.7))  # Reduce marketing
+                strategy += " (Adjusted for positive profit)"
+            
+            return {
+                'price': round(price, 2),
+                'production': max(AgentConfig.MIN_PRODUCTION, min(AgentConfig.MAX_PRODUCTION, production)),
+                'marketing': max(AgentConfig.MIN_MARKETING, min(AgentConfig.MAX_MARKETING, marketing)),
+                'reasoning': f'{agent_type.upper()} Agent: {strategy}',
+                'agent_type': agent_type,
+                'ai_enhanced': False,
+                'profit_focused': True,
+                'expected_profit': round(expected_profit, 0),
+                'profit_trend': profit_trend
+            }
 
-class BrewMastersCoordinator:
-    """Main coordinator for all three frameworks"""
+class CommonAgentManager:
+    """Enhanced agent manager with historical data tracking"""
     
     def __init__(self, gemini_api_key: Optional[str] = None):
-        print("🔄 Initializing BrewMasters Coordinator...")
-        print(f"🐍 Python version: {sys.version}")
-        print(f"📁 Current directory: {os.getcwd()}")
+        self.ai_helper = ProfitOptimizedGeminiHelper(gemini_api_key)
+        self.history_tracker = HistoricalDataTracker()
+        print("Enhanced Agent Manager with profit optimization initialized")
+    
+    async def get_framework_decision(self, framework: str, context: Dict[str, Any], 
+                                   team_color: str) -> Dict[str, Any]:
+        """Get framework decision with historical context"""
         
-        self.ai_helper = EnhancedGeminiHelper(gemini_api_key)
+        # Get historical data for this team
+        team_history = self.history_tracker.get_team_history(team_color)
+        market_trends = self.history_tracker.get_market_trends()
+        
+        # Add historical context to decision context
+        enhanced_context = context.copy()
+        enhanced_context['team_history'] = team_history
+        enhanced_context['market_trends'] = market_trends
+        
+        print(f"Getting {framework} decision with {len(team_history.get('profits', []))} turns of history...")
+        
+        if framework == "mesa":
+            # Mesa: Parallel specialists + coordination
+            pricing_task = asyncio.create_task(
+                self.ai_helper.get_profitable_decision("pricing", enhanced_context, team_history, market_trends, framework)
+            )
+            production_task = asyncio.create_task(
+                self.ai_helper.get_profitable_decision("production", enhanced_context, team_history, market_trends, framework)
+            )
+            marketing_task = asyncio.create_task(
+                self.ai_helper.get_profitable_decision("marketing", enhanced_context, team_history, market_trends, framework)
+            )
+            
+            pricing_dec, production_dec, marketing_dec = await asyncio.gather(pricing_task, production_task, marketing_task)
+            
+            # CEO coordinates with profit focus
+            coord_context = enhanced_context.copy()
+            coord_context['specialist_proposals'] = {
+                'pricing': pricing_dec, 'production': production_dec, 'marketing': marketing_dec
+            }
+            
+            final_decision = await self.ai_helper.get_profitable_decision("ceo", coord_context, team_history, market_trends, framework)
+            
+            return {
+                'price': final_decision['price'],
+                'production': final_decision['production'],
+                'marketing': final_decision['marketing'],
+                'reasoning': f"Mesa MAS: {final_decision['reasoning']}",
+                'framework': 'mesa',
+                'expected_profit': final_decision.get('expected_profit', 0)
+            }
+        
+        elif framework == "temporal":
+            # Temporal: Sequential workflow with profit optimization
+            
+            # Activity 1: Market analysis
+            market_analysis = await self.ai_helper.get_profitable_decision(
+                "pricing", enhanced_context, team_history, market_trends, framework
+            )
+            
+            # Activity 2: Production planning
+            prod_context = enhanced_context.copy()
+            prod_context['market_analysis'] = market_analysis
+            production_plan = await self.ai_helper.get_profitable_decision(
+                "production", prod_context, team_history, market_trends, framework
+            )
+            
+            # Activity 3: Marketing optimization
+            mkt_context = enhanced_context.copy()
+            mkt_context['production_plan'] = production_plan
+            marketing_plan = await self.ai_helper.get_profitable_decision(
+                "marketing", mkt_context, team_history, market_trends, framework
+            )
+            
+            # Activity 4: Strategic coordination
+            final_context = enhanced_context.copy()
+            final_context['workflow_results'] = {
+                'market_analysis': market_analysis,
+                'production_plan': production_plan,
+                'marketing_plan': marketing_plan
+            }
+            final_decision = await self.ai_helper.get_profitable_decision(
+                "ceo", final_context, team_history, market_trends, framework
+            )
+            
+            return {
+                'price': final_decision['price'],
+                'production': final_decision['production'],
+                'marketing': final_decision['marketing'],
+                'reasoning': f"Temporal Workflow: {final_decision['reasoning']}",
+                'framework': 'temporal',
+                'expected_profit': final_decision.get('expected_profit', 0)
+            }
+        
+        else:  # google_adk
+            # Google ADK: ML pipeline with profit optimization
+            
+            # ML Service 1: Vertex AI prediction
+            vertex_context = enhanced_context.copy()
+            vertex_context['ml_service'] = 'vertex_ai'
+            vertex_pred = await self.ai_helper.get_profitable_decision(
+                "pricing", vertex_context, team_history, market_trends, framework
+            )
+            
+            # ML Service 2: AutoML optimization
+            automl_context = enhanced_context.copy()
+            automl_context['vertex_result'] = vertex_pred
+            automl_context['ml_service'] = 'automl'
+            automl_opt = await self.ai_helper.get_profitable_decision(
+                "production", automl_context, team_history, market_trends, framework
+            )
+            
+            # ML Service 3: BigQuery analytics
+            bigquery_context = enhanced_context.copy()
+            bigquery_context['ml_results'] = {'vertex': vertex_pred, 'automl': automl_opt}
+            bigquery_context['ml_service'] = 'bigquery'
+            bigquery_analytics = await self.ai_helper.get_profitable_decision(
+                "marketing", bigquery_context, team_history, market_trends, framework
+            )
+            
+            # ML Service 4: AI Platform ensemble
+            ensemble_context = enhanced_context.copy()
+            ensemble_context['ml_pipeline_complete'] = {
+                'vertex': vertex_pred, 'automl': automl_opt, 'bigquery': bigquery_analytics
+            }
+            ensemble_context['ml_service'] = 'ensemble'
+            ensemble_decision = await self.ai_helper.get_profitable_decision(
+                "ceo", ensemble_context, team_history, market_trends, framework
+            )
+            
+            return {
+                'price': ensemble_decision['price'],
+                'production': ensemble_decision['production'],
+                'marketing': ensemble_decision['marketing'],
+                'reasoning': f"Google ADK ML: {ensemble_decision['reasoning']}",
+                'framework': 'google_adk',
+                'expected_profit': ensemble_decision.get('expected_profit', 0)
+            }
+
+class BrewMastersGame:
+    """Enhanced game with historical tracking and profit optimization"""
+    
+    def __init__(self, gemini_api_key: Optional[str] = None):
+        self.agent_manager = CommonAgentManager(gemini_api_key)
         self.turn = 0
         self.competition_mode = False
         
-        # Initialize all teams
         self.teams = {
-            'green': {
-                'name': 'Human Player',
-                'profit': 100000,
-                'inventory': 100,
-                'price': 10.0,
-                'production': 50,
-                'marketing': 500,
-                'profit_this_turn': 0
-            },
-            'blue': {
-                'name': 'Mesa Multi-Agent System',
-                'profit': 100000,
-                'inventory': 100,
-                'price': 10.0,
-                'production': 50,
-                'marketing': 500,
-                'profit_this_turn': 0
-            },
-            'purple': {
-                'name': 'Temporal Workflow System',
-                'profit': 100000,
-                'inventory': 100,
-                'price': 10.0,
-                'production': 50,
-                'marketing': 500,
-                'profit_this_turn': 0
-            },
-            'orange': {
-                'name': 'Google ADK ML System',
-                'profit': 100000,
-                'inventory': 100,
-                'price': 10.0,
-                'production': 50,
-                'marketing': 500,
-                'profit_this_turn': 0
-            }
+            'green': {'name': 'Human', 'profit': 100000, 'inventory': 100, 'price': 10.0, 'production': 50, 'marketing': 500, 'profit_this_turn': 0},
+            'blue': {'name': 'Mesa MAS', 'profit': 100000, 'inventory': 100, 'price': 10.0, 'production': 50, 'marketing': 500, 'profit_this_turn': 0},
+            'purple': {'name': 'Temporal Workflow', 'profit': 100000, 'inventory': 100, 'price': 10.0, 'production': 50, 'marketing': 500, 'profit_this_turn': 0},
+            'orange': {'name': 'Google ADK ML', 'profit': 100000, 'inventory': 100, 'price': 10.0, 'production': 50, 'marketing': 500, 'profit_this_turn': 0}
         }
         
-        ai_status = f"Enhanced with Gemini ({self.ai_helper.model_name})" if self.ai_helper.enabled else "Smart Rule-based Fallbacks"
-        
+        ai_status = "Profit-Optimized Gemini" if self.agent_manager.ai_helper.enabled else "Profit-Optimized Rule-based"
         self.event_log = [
-            "🎮 Multi-Framework BrewMasters Started!",
-            f"🤖 AI Status: {ai_status}",
-            "🔧 Frameworks Active: Mesa MAS + Temporal Workflows + Google ADK ML",
-            "⚔️ Ready for epic framework battles!"
+            "Multi-Framework BrewMasters with Profit Optimization Started!",
+            f"AI Status: {ai_status}",
+            "Enhanced Features: Historical data tracking + Profit focus",
+            "All decisions optimized for profitability!"
         ]
         
-        print("✅ BrewMasters Coordinator initialized successfully")
-        if self.ai_helper.enabled:
-            print(f"🎯 AI Model: {self.ai_helper.model_name}")
-        else:
-            print("⚠️ Using rule-based fallbacks (AI not available)")
+        print(f"BrewMasters with profit optimization initialized")
     
     async def process_turn(self, human_decisions: Dict[str, Any]) -> Dict[str, Any]:
-        """Process complete turn for all frameworks"""
         self.turn += 1
-        print(f"\n🎯 Processing Turn {self.turn}")
+        print(f"\n=== PROCESSING TURN {self.turn} WITH PROFIT OPTIMIZATION ===")
         
-        # Process human team
+        # Human decisions
         human_team = self.teams['green']
         human_team.update({
             'price': float(human_decisions.get('price', 10)),
@@ -858,54 +660,52 @@ class BrewMastersCoordinator:
             'marketing': int(human_decisions.get('marketingSpend', 500))
         })
         
-        print(f"👤 Human decisions: ${human_team['price']:.2f}, {human_team['production']}u, ${human_team['marketing']}m")
-        
-        # Prepare context for AI frameworks
+        # AI framework decisions with historical context
         base_context = {
             'turn': self.turn,
-            'competitor_prices': [team['price'] for team in self.teams.values()],
+            'competitor_prices': [team['price'] for team in self.teams.values()]
         }
         
-        # Process each AI framework
-        frameworks = [
-            ('blue', 'mesa'),
-            ('purple', 'temporal'),
-            ('orange', 'google_adk')
-        ]
+        frameworks = [('blue', 'mesa'), ('purple', 'temporal'), ('orange', 'google_adk')]
         
-        framework_decisions = {}
-        for color, framework_name in frameworks:
+        for color, framework in frameworks:
             context = base_context.copy()
             context.update({
                 'inventory': self.teams[color]['inventory'],
-                'current_price': self.teams[color]['price']
+                'current_price': self.teams[color]['price'],
+                'profit': self.teams[color]['profit']
             })
             
-            # Get AI decision
-            decision = await self.ai_helper.make_decision(framework_name, context)
-            framework_decisions[framework_name] = decision
+            decision = await self.agent_manager.get_framework_decision(framework, context, color)
             
-            # Update team
             self.teams[color].update({
                 'price': decision['price'],
                 'production': decision['production'],
                 'marketing': decision['marketing']
             })
             
-            print(f"🤖 {framework_name}: ${decision['price']:.2f}, {decision['production']}u, ${decision['marketing']}m")
+            expected_profit = decision.get('expected_profit', 'unknown')
+            print(f"{framework}: ${decision['price']:.2f}, {decision['production']}u, ${decision['marketing']}m (Expected profit: {expected_profit})")
         
-        # Calculate results for all teams
+        # Calculate results with enhanced profit tracking
         turn_results = {}
         for color, team in self.teams.items():
-            demand = self._calculate_demand(team['price'], team['marketing'])
+            # Enhanced demand calculation
+            demand = 50 + (team['marketing'] / 500) * 15 + (10 - team['price']) * 5 + random.randint(-8, 8)
+            demand = max(10, min(120, int(demand)))
+            
             sales = min(demand, team['inventory'])
             revenue = sales * team['price']
-            costs = (team['production'] * 3.5 + 
-                    team['marketing'] + 
-                    team['inventory'] * 0.5)
-            profit_this_turn = revenue - costs
             
-            # Update team
+            # Detailed cost calculation
+            production_costs = team['production'] * AgentConfig.UNIT_PRODUCTION_COST
+            marketing_costs = team['marketing']
+            holding_costs = team['inventory'] * AgentConfig.UNIT_HOLDING_COST
+            total_costs = production_costs + marketing_costs + holding_costs
+            
+            profit_this_turn = revenue - total_costs
+            
+            # Update team state
             team['inventory'] = max(0, team['inventory'] - sales + team['production'])
             team['profit'] += profit_this_turn
             team['profit_this_turn'] = profit_this_turn
@@ -913,123 +713,66 @@ class BrewMastersCoordinator:
             turn_results[color] = {
                 'sales': sales,
                 'demand': demand,
+                'revenue': revenue,
+                'costs': total_costs,
                 'profit_this_turn': profit_this_turn
             }
+            
+            # Log profit warnings
+            if profit_this_turn < 0:
+                print(f"WARNING: {team['name']} made a loss of ${profit_this_turn:.0f} this turn!")
         
-        # Determine best performer
-        ai_performances = [
+        # Add turn data to historical tracker
+        self.agent_manager.history_tracker.add_turn_data(self.turn, self.teams, turn_results)
+        
+        # Update event log with profit focus
+        best_ai = max([
             ('Mesa', turn_results['blue']['profit_this_turn']),
             ('Temporal', turn_results['purple']['profit_this_turn']),
             ('Google ADK', turn_results['orange']['profit_this_turn'])
-        ]
-        best_ai = max(ai_performances, key=lambda x: x[1])
+        ], key=lambda x: x[1])
         
-        # Update event log
+        # Count profitable teams
+        profitable_teams = len([result for result in turn_results.values() if result['profit_this_turn'] > 0])
+        
         self.event_log = [
-            f"📊 Turn {self.turn} - Framework Battle Results",
-            f"👤 Human: ${human_team['price']:.2f} → {turn_results['green']['sales']} sales, ${turn_results['green']['profit_this_turn']:+.0f} profit",
-            f"🤖 Mesa: ${self.teams['blue']['price']:.2f} → {turn_results['blue']['sales']} sales, ${turn_results['blue']['profit_this_turn']:+.0f} profit",
-            f"⚡ Temporal: ${self.teams['purple']['price']:.2f} → {turn_results['purple']['sales']} sales, ${turn_results['purple']['profit_this_turn']:+.0f} profit", 
-            f"🧠 Google ADK: ${self.teams['orange']['price']:.2f} → {turn_results['orange']['sales']} sales, ${turn_results['orange']['profit_this_turn']:+.0f} profit",
-            f"🏆 Best AI This Turn: {best_ai[0]} (${best_ai[1]:+.0f})",
-            f"💡 AI Mode: {'Gemini Enhanced' if self.ai_helper.enabled else 'Smart Rule-based'}"
+            f"Turn {self.turn} - Profit-Optimized Framework Battle",
+            f"Human: ${human_team['price']:.2f} -> {turn_results['green']['sales']} sales, ${turn_results['green']['profit_this_turn']:+.0f} profit",
+            f"Mesa: ${self.teams['blue']['price']:.2f} -> {turn_results['blue']['sales']} sales, ${turn_results['blue']['profit_this_turn']:+.0f} profit",
+            f"Temporal: ${self.teams['purple']['price']:.2f} -> {turn_results['purple']['sales']} sales, ${turn_results['purple']['profit_this_turn']:+.0f} profit",
+            f"Google ADK: ${self.teams['orange']['price']:.2f} -> {turn_results['orange']['sales']} sales, ${turn_results['orange']['profit_this_turn']:+.0f} profit",
+            f"Best Framework: {best_ai[0]} (${best_ai[1]:+.0f} profit)",
+            f"Profitable Teams: {profitable_teams}/4",
+            f"Intelligence: {'Gemini AI' if self.agent_manager.ai_helper.enabled else 'Rule-based'} with profit optimization"
         ]
         
-        print("✅ Turn processing complete\n")
+        print(f"Turn {self.turn} complete - {profitable_teams}/4 teams profitable")
         return self.get_game_state()
     
-    def _calculate_demand(self, price: float, marketing: int) -> int:
-        """Calculate market demand"""
-        base_demand = 50
-        marketing_boost = (marketing / 500) * 15
-        price_effect = (10 - price) * 5
-        random_factor = random.randint(-10, 10)
-        
-        demand = int(base_demand + marketing_boost + price_effect + random_factor)
-        return max(10, min(120, demand))
-    
     def get_game_state(self) -> Dict[str, Any]:
-        """Get current game state in expected format"""
         state = {
             'turn': self.turn,
             'competition_mode': self.competition_mode,
             'event_log': self.event_log
         }
         
-        # Add team data in expected format
         for color, team in self.teams.items():
             prefix = f"{color}_team"
             for key, value in team.items():
-                if key != 'name':  # Exclude name from state
+                if key != 'name':
                     state[f"{prefix}_{key}"] = value
         
-        return state
-    
-    async def run_competition(self, websocket: WebSocket, turns: int):
-        """Run AI framework competition"""
-        self.competition_mode = True
-        print(f"🏆 Starting {turns}-turn AI competition")
-        
-        for turn_num in range(turns):
-            if not self.competition_mode:
-                break
-            
-            # Human team frozen during competition
-            mock_human_decisions = {
-                'price': 10.0,
-                'productionTarget': 50,
-                'marketingSpend': 500
-            }
-            
-            # Process turn
-            updated_state = await self.process_turn(mock_human_decisions)
-            
-            # Send progress update
-            progress = ((turn_num + 1) / turns) * 100
-            response = updated_state.copy()
-            response.update({
-                'compete_progress': progress,
-                'compete_complete': (turn_num + 1 == turns),
-                'competition_turn': turn_num + 1
-            })
-            
-            await websocket.send_text(json.dumps(response))
-            await asyncio.sleep(0.8)  # Pause for visualization
-        
-        self.competition_mode = False
-        
-        # Send final results
-        final_profits = {
-            'Mesa': self.teams['blue']['profit'],
-            'Temporal': self.teams['purple']['profit'],
-            'Google ADK': self.teams['orange']['profit']
+        # Add historical data summary
+        state['historical_summary'] = {
+            'turns_played': self.turn,
+            'market_trends': self.agent_manager.history_tracker.get_market_trends(),
+            'profit_optimization_active': True
         }
-        winner = max(final_profits.items(), key=lambda x: x[1])
         
-        final_response = self.get_game_state()
-        final_response.update({
-            'event_log': [
-                "🏆 FRAMEWORK COMPETITION COMPLETE!",
-                f"🥇 Champion: {winner[0]} with ${winner[1]:,.0f} total profit!",
-                "",
-                "📊 Final Standings:",
-                *[f"  {name}: ${profit:,.0f}" for name, profit in 
-                  sorted(final_profits.items(), key=lambda x: x[1], reverse=True)],
-                "",
-                f"⚔️ Battle Duration: {turns} turns",
-                f"🤖 AI Mode: {'Gemini Enhanced' if self.ai_helper.enabled else 'Smart Rule-based'}"
-            ],
-            'compete_progress': 100,
-            'compete_complete': True,
-            'competition_results': final_profits,
-            'winner': winner[0]
-        })
-        
-        await websocket.send_text(json.dumps(final_response))
-        print(f"🏆 Competition complete! Winner: {winner[0]}")
+        return state
 
-# FastAPI Application
-app = FastAPI(title="BrewMasters Multi-Framework Battle - Enhanced")
+# FastAPI setup
+app = FastAPI(title="BrewMasters Profit-Optimized with Historical Data")
 
 app.add_middleware(
     CORSMiddleware,
@@ -1039,124 +782,76 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Global coordinator
-coordinator: Optional[BrewMastersCoordinator] = None
+game: Optional[BrewMastersGame] = None
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
-    print("🔌 Client connected")
+    print("Client connected")
     
-    global coordinator
-    if coordinator is None:
+    global game
+    if game is None:
         gemini_api_key = os.getenv("GEMINI_API_KEY")
-        coordinator = BrewMastersCoordinator(gemini_api_key)
+        game = BrewMastersGame(gemini_api_key)
     
     try:
-        # Send initial state
-        initial_state = coordinator.get_game_state()
+        initial_state = game.get_game_state()
         initial_state['server_info'] = {
-            'version': '2.1.2-enhanced',
-            'frameworks': ['Mesa MAS', 'Temporal Workflows', 'Google ADK ML'],
-            'ai_enabled': coordinator.ai_helper.enabled,
-            'gemini_model': getattr(coordinator.ai_helper, 'model_name', 'N/A')
+            'version': '3.1.0-profit-optimized',
+            'features': ['Historical Data Tracking', 'Profit Optimization', 'Loss Prevention'],
+            'ai_enabled': game.agent_manager.ai_helper.enabled
         }
         await websocket.send_text(json.dumps(initial_state))
-        print("📤 Initial state sent")
+        print("Initial state sent")
         
         async for message in websocket.iter_text():
             try:
                 data = json.loads(message)
-                print(f"📨 Received: {data}")
                 
-                # Handle commands
                 if data.get('restart'):
-                    print("🔄 Restarting game")
-                    coordinator = BrewMastersCoordinator(os.getenv("GEMINI_API_KEY"))
-                    await websocket.send_text(json.dumps(coordinator.get_game_state()))
+                    game = BrewMastersGame(os.getenv("GEMINI_API_KEY"))
+                    await websocket.send_text(json.dumps(game.get_game_state()))
                     continue
                 
-                if data.get('compete'):
-                    turns = data.get('turns', 10)
-                    asyncio.create_task(coordinator.run_competition(websocket, turns))
-                    continue
+                updated_state = await game.process_turn(data)
+                await websocket.send_text(json.dumps(updated_state))
                 
-                if data.get('stopCompete'):
-                    coordinator.competition_mode = False
-                    print("⏹️ Competition stopped")
-                    continue
-                
-                # Normal turn processing
-                if not coordinator.competition_mode:
-                    updated_state = await coordinator.process_turn(data)
-                    await websocket.send_text(json.dumps(updated_state))
-                else:
-                    await websocket.send_text(json.dumps({
-                        "message": "Turn ignored - competition in progress"
-                    }))
-                
-            except json.JSONDecodeError as e:
-                await websocket.send_text(json.dumps({"error": f"Invalid JSON: {e}"}))
             except Exception as e:
-                print(f"❌ Error processing message: {e}")
+                print(f"Error: {e}")
                 import traceback
                 traceback.print_exc()
                 await websocket.send_text(json.dumps({"error": str(e)}))
     
     except WebSocketDisconnect:
-        print("🔌 Client disconnected")
-    except Exception as e:
-        print(f"❌ WebSocket error: {e}")
+        print("Client disconnected")
 
 @app.get("/")
 async def read_root():
     return {
-        "message": "🎮 BrewMasters Multi-Framework Battle Arena (Enhanced)",
-        "version": "2.1.2-enhanced",
-        "status": "Ready for battle!",
-        "frameworks": {
-            "mesa": "Multi-Agent System with specialized coordination",
-            "temporal": "Workflow orchestration with sequential activities",
-            "google_adk": "ML/Cloud optimization with predictive analytics"
-        },
-        "ai_status": coordinator.ai_helper.enabled if coordinator else "Not initialized",
-        "gemini_model": getattr(coordinator.ai_helper, 'model_name', 'N/A') if coordinator else "N/A"
-    }
-
-@app.get("/status")
-async def get_status():
-    if not coordinator:
-        return {"status": "not_initialized"}
-    
-    return {
-        "status": "ready",
-        "turn": coordinator.turn,
-        "competition_mode": coordinator.competition_mode,
-        "ai_enabled": coordinator.ai_helper.enabled,
-        "gemini_model": getattr(coordinator.ai_helper, 'model_name', 'N/A'),
-        "teams": {
-            color: {
-                "name": team["name"],
-                "profit": team["profit"],
-                "inventory": team["inventory"]
-            }
-            for color, team in coordinator.teams.items()
-        }
+        "message": "BrewMasters Profit-Optimized with Historical Data",
+        "version": "3.1.0-profit-optimized",
+        "features": [
+            "Historical data tracking for all teams",
+            "Profit-optimized agent decisions", 
+            "Loss prevention mechanisms",
+            "Enhanced AI prompts with historical context"
+        ],
+        "ai_enabled": game.agent_manager.ai_helper.enabled if game else False
     }
 
 if __name__ == "__main__":
-    print("🚀 Starting Enhanced BrewMasters Multi-Framework Battle Arena...")
-    print("🔧 Frameworks: Mesa MAS + Temporal Workflows + Google ADK ML")
-    print("🤖 Enhanced Gemini AI integration with detailed diagnostics")
-    print("⚔️ Ready for epic framework battles!")
+    print("Starting BrewMasters Profit-Optimized System...")
+    print("Features:")
+    print("- Historical data tracking")
+    print("- Profit optimization focus") 
+    print("- Loss prevention")
+    print("- Enhanced AI prompts")
     
-    # Detailed environment check
     gemini_key = os.getenv("GEMINI_API_KEY")
-    if gemini_key and gemini_key != "your_gemini_api_key_here":
-        print(f"✅ Gemini API key detected: {gemini_key[:10]}...")
+    if gemini_key:
+        print(f"Gemini API key found - AI agents will be profit-optimized")
     else:
-        print("⚠️ No valid Gemini API key found")
-        print("💡 Set GEMINI_API_KEY environment variable for AI enhancement")
+        print("No API key - using profit-optimized rule-based decisions")
     
-    print("🌐 Starting server on http://localhost:8000")
+    print("All agents now focus on profitability and use historical data!")
     uvicorn.run(app, host="0.0.0.0", port=8000)
